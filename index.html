@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Analysis Pipeline</title>
+    
+    <!-- Plotly JS -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <!-- PyScript -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
+    <!-- PyScript configuration -->
+    <py-config>
+        packages = ["plotly", "pandas"]
+
+        [files]
+        "analysis/__init__.py" = "./analysis/__init__.py"
+        "analysis/data_utils.py" = "./analysis/data_utils.py"
+        "analysis/plot_utils.py" = "./analysis/plot_utils.py"
+    </py-config>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .file-upload-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, max-content) 300px;
+            gap: 15px 30px;
+            align-items: center;
+            max-width: 600px;
+            margin-bottom: 25px;
+        }
+
+        .file-upload-grid label {
+            font-weight: 600;
+        }
+
+        .loading-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background-color: #f0f7ff;
+            border: 1px solid #b6d4fe;
+            border-radius: 6px;
+            padding: 12px 16px;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 3px solid #b6d4fe;
+            border-top: 3px solid #0d6efd;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #219150;
+        }
+
+        .btn-secondary {
+            background-color: #2980b9;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #1f6391;
+        }
+
+        .status {
+            display: inline-block;
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #d6d6d6;
+            background: #f7f7f7;
+            color: #333;
+        }
+        .status.loading {
+            background: #fff7d6;
+            border-color: #e8c76d;
+            color: #7a5a00;
+        }
+        .status.ready {
+            background: #e8f7ee;
+            border-color: #9ad3b0;
+            color: #1d6b3d;
+        }
+        .status.error {
+            background: #fdeaea;
+            border-color: #d88a8a;
+            color: #8a1f1f;
+        }
+
+        .download-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 18px;
+            background-color: #8e44ad;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .download-btn:hover {
+            background-color: #71368a;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Data Analysis Pipeline</h2>
+
+    <div id="loading-banner" class="loading-card">
+        <div class="spinner"></div>
+        <div>
+            <strong>Initializing Python Runtime...</strong><br>
+            <small style="color: #555;">Downloading WebAssembly modules. This takes a few seconds on first load.</small>
+        </div>
+    </div>
+
+    <div class="file-upload-grid">
+        <label for="csv1">Baseline Team Survey File:</label>
+        <input type="file" id="csv1" accept=".csv">
+
+        <label for="csv2">Weekly Survey File:</label>
+        <input type="file" id="csv2" accept=".csv">
+
+        <label for="csv3">Assessment Scores File:</label>
+        <input type="file" id="csv3" accept=".csv">
+    </div>
+
+    <div class="button-group">
+        <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Create CSV for Analysis</button>
+        <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
+    </div>
+
+    <hr style="margin: 25px 0;">
+
+    <div id="output-status" class="status loading" aria-live="polite">Status: Initializing environment...</div>
+    <br><br>
+    <div id="download-container"></div>
+    <br>
+    <div id="report-container"></div>
+    <br>
+    <div id="plot-container" style="width: 100%; max-width: 800px; height: 450px;"></div>
+
+    <script>
+        function set_status(message, kind) {
+            const status = document.getElementById("output-status");
+            if (!status) return;
+            status.innerText = message;
+            status.className = "status " + kind;
+        }
+
+        addEventListener("py:ready", () => {
+            const banner = document.getElementById("loading-banner");
+            if (banner) banner.style.display = "none";
+            set_status("Status: Ready to Process", "ready");
+        });
+    </script>
+
+    <script type="py">
+        import js
+        import urllib.parse
+        from analysis.data_utils import process_all_surveys
+
+        async def create_csv(event):
+            file1 = js.document.getElementById("csv1").files.item(0)
+            file2 = js.document.getElementById("csv2").files.item(0)
+            file3 = js.document.getElementById("csv3").files.item(0)
+
+            if not file1 or not file2:
+                js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
+                return
+
+            js.set_status("Processing surveys with Pandas...", "loading")
+            
+            try:
+                # Call your orchestrator function from data_utils.py
+                final_df = await process_all_surveys(file1, file2, file3)
+                
+                # Convert DataFrame to a downloadable CSV Data URI
+                csv_data = final_df.to_csv(index=False)
+                encoded_csv = urllib.parse.quote(csv_data)
+                
+                download_html = f'<a href="data:text/csv;charset=utf-8,{encoded_csv}" download="processed_survey_data.csv" class="download-btn">Download Processed CSV</a>'
+                js.document.getElementById("download-container").innerHTML = download_html
+                js.set_status("Combined CSV Generated!", "ready")
+            except Exception as e:
+                # Displays exact Python exception message in the status bar if something breaks
+                js.set_status(f"Error processing files: {str(e)}", "error")
+
+        async def generate_report(event):
+            file1 = js.document.getElementById("csv1").files.item(0)
+            file2 = js.document.getElementById("csv2").files.item(0)
+            file3 = js.document.getElementById("csv3").files.item(0)
+
+            if not file1 or not file2:
+                js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
+                return
+
+            js.set_status("Generating Analysis Report...", "loading")
+            
+            try:
+                final_df = await process_all_surveys(file1, file2, file3)
+
+                js.document.getElementById("report-container").innerHTML = f"""
+                    <h3>Summary Analysis</h3>
+                    <p>Total Unique Participants: <b>{len(final_df):,}</b></p>
+                    <p>Total Processed Columns: <b>{len(final_df.columns):,}</b></p>
+                """
+                js.set_status("Summary Report Generated!", "ready")
+            except Exception as e:
+                js.set_status(f"Error generating report: {str(e)}", "error")
+    </script>
+</body>
+</html>

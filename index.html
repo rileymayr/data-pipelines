@@ -16,6 +16,7 @@
         [files]
         "analysis/__init__.py" = "./analysis/__init__.py"
         "analysis/data_utils.py" = "./analysis/data_utils.py"
+        "web/app.py" = "./web/app.py"
     </py-config>
 
     <style>
@@ -167,6 +168,7 @@
 
     <div class="button-group">
         <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Create CSV for Analysis</button>
+        <button id="btn-demographics" class="btn btn-secondary" py-click="create_demographics_zip">Create Demographics ZIP</button>
         <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
     </div>
 
@@ -195,65 +197,6 @@
         });
     </script>
 
-    <script type="py">
-        import js
-        import urllib.parse
-        from analysis.data_utils import process_all_surveys
-
-        async def create_csv(event):
-            file1 = js.document.getElementById("csv1").files.item(0)
-            file2 = js.document.getElementById("csv2").files.item(0)
-            file3 = js.document.getElementById("csv3").files.item(0)
-            static_cols_file = js.document.getElementById("csv-static").files.item(0)
-
-            if not file1 or not file2:
-                js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
-                return
-
-            js.set_status("Processing surveys with Pandas...", "loading")
-            
-            try:
-                # Call your orchestrator function from data_utils.py
-                final_df = await process_all_surveys(
-                    file1, file2, file3, static_cols_file=static_cols_file
-                )
-                
-                # Convert DataFrame to a downloadable CSV Data URI
-                csv_data = final_df.to_csv(index=False)
-                encoded_csv = urllib.parse.quote(csv_data)
-                
-                download_html = f'<a href="data:text/csv;charset=utf-8,{encoded_csv}" download="processed_survey_data.csv" class="download-btn">Download Processed CSV</a>'
-                js.document.getElementById("download-container").innerHTML = download_html
-                js.set_status("Combined CSV Generated!", "ready")
-            except Exception as e:
-                # Displays exact Python exception message in the status bar if something breaks
-                js.set_status(f"Error processing files: {str(e)}", "error")
-
-        async def generate_report(event):
-            file1 = js.document.getElementById("csv1").files.item(0)
-            file2 = js.document.getElementById("csv2").files.item(0)
-            file3 = js.document.getElementById("csv3").files.item(0)
-            static_cols_file = js.document.getElementById("csv-static").files.item(0)
-
-            if not file1 or not file2:
-                js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
-                return
-
-            js.set_status("Generating Analysis Report...", "loading")
-            
-            try:
-                final_df = await process_all_surveys(
-                    file1, file2, file3, static_cols_file=static_cols_file
-                )
-
-                js.document.getElementById("report-container").innerHTML = f"""
-                    <h3>Summary Analysis</h3>
-                    <p>Total Unique Participants: <b>{len(final_df):,}</b></p>
-                    <p>Total Processed Columns: <b>{len(final_df.columns):,}</b></p>
-                """
-                js.set_status("Summary Report Generated!", "ready")
-            except Exception as e:
-                js.set_status(f"Error generating report: {str(e)}", "error")
-    </script>
+    <script type="py" src="web/app.py"></script>
 </body>
 </html>

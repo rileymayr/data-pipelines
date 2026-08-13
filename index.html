@@ -5,21 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Analysis Pipeline</title>
     
-    <!-- Plotly JS -->
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-
-    <!-- PyScript -->
+    <link rel="preconnect" href="https://pyscript.net" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
 
-    <!-- PyScript configuration -->
     <py-config>
         packages = ["pandas"]
 
         [files]
         "analysis/__init__.py" = "./analysis/__init__.py"
         "analysis/data_utils.py" = "./analysis/data_utils.py"
-        "analysis/plot_utils.py" = "./analysis/plot_utils.py"
     </py-config>
 
     <style>

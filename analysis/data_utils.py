@@ -1,4 +1,5 @@
 import io
+import csv
 import re
 import pandas as pd
 
@@ -37,6 +38,35 @@ async def load_csv_data(
         return pd.read_csv(file_input, **kwargs)
 
     raise TypeError(f"Unsupported file input type: {type(file_input)}")
+
+
+async def load_static_columns(file_input) -> list[str]:
+    """Read the uploaded one-column static-fields CSV as a list of names."""
+
+    if file_input is None:
+        return []
+
+    if JsProxy and isinstance(file_input, JsProxy):
+        array_buffer = await file_input.arrayBuffer()
+        file_bytes = array_buffer.to_py()
+        file_text = bytes(file_bytes).decode("utf-8-sig")
+    elif isinstance(file_input, str):
+        with open(file_input, encoding="utf-8-sig") as file:
+            file_text = file.read()
+    elif isinstance(file_input, bytes):
+        file_text = file_input.decode("utf-8-sig")
+    elif isinstance(file_input, io.BytesIO):
+        file_text = file_input.getvalue().decode("utf-8-sig")
+    elif isinstance(file_input, io.StringIO):
+        file_text = file_input.getvalue()
+    else:
+        raise TypeError(f"Unsupported static columns input type: {type(file_input)}")
+
+    return [
+        row[0].strip().strip("'\"")
+        for row in csv.reader(io.StringIO(file_text), skipinitialspace=True)
+        if row and row[0].strip().strip("'\"")
+    ]
 
 
 def load_csv_local(
@@ -225,9 +255,13 @@ async def process_all_surveys(
     weekly_file,
     assessment_file=None,
     static_cols: list[str] | None = None,
+    static_cols_file=None,
 ) -> pd.DataFrame:
     """Executes the full survey processing pipeline across all uploaded files."""
     
+    if static_cols is None:
+        static_cols = await load_static_columns(static_cols_file)
+
     # 1. Process Baseline Data
     baseline_df = await load_csv_data(baseline_file)
     baseline_df = drop_unfinished_surveys(baseline_df)
@@ -243,7 +277,7 @@ async def process_all_surveys(
 
     # 3. Pivot Weekly Survey to Wide Format
     weekly_wide_df = pivot_weekly_survey_to_wide(
-        weekly_df, id_col="Name", static_cols=static_cols
+        weekly_df, id_col="Name", week_col='NIFE Week', date_col='', static_cols=static_cols
     )
 
     # 4. Merge Baseline with Pivoted Weekly Data

@@ -5,21 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Analysis Pipeline</title>
     
-    <!-- Plotly JS -->
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-
-    <!-- PyScript -->
+    <link rel="preconnect" href="https://pyscript.net" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
 
-    <!-- PyScript configuration -->
     <py-config>
-        packages = ["plotly", "pandas"]
+        packages = ["pandas"]
 
         [files]
         "analysis/__init__.py" = "./analysis/__init__.py"
         "analysis/data_utils.py" = "./analysis/data_utils.py"
-        "analysis/plot_utils.py" = "./analysis/plot_utils.py"
+        "web/app.py" = "./web/app.py"
     </py-config>
 
     <style>
@@ -162,12 +159,16 @@
         <label for="csv2">Weekly Survey File:</label>
         <input type="file" id="csv2" accept=".csv">
 
+        <label for="csv-static">Static Weekly Columns File:</label>
+        <input type="file" id="csv-static" accept=".csv">
+
         <label for="csv3">Assessment Scores File:</label>
         <input type="file" id="csv3" accept=".csv">
     </div>
 
     <div class="button-group">
         <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Create CSV for Analysis</button>
+        <button id="btn-demographics" class="btn btn-secondary" py-click="create_demographics_zip">Create Demographics ZIP</button>
         <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
     </div>
 
@@ -196,59 +197,6 @@
         });
     </script>
 
-    <script type="py">
-        import js
-        import urllib.parse
-        from analysis.data_utils import process_all_surveys
-
-        async def create_csv(event):
-            file1 = js.document.getElementById("csv1").files.item(0)
-            file2 = js.document.getElementById("csv2").files.item(0)
-            file3 = js.document.getElementById("csv3").files.item(0)
-
-            if not file1 or not file2:
-                js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
-                return
-
-            js.set_status("Processing surveys with Pandas...", "loading")
-            
-            try:
-                # Call your orchestrator function from data_utils.py
-                final_df = await process_all_surveys(file1, file2, file3)
-                
-                # Convert DataFrame to a downloadable CSV Data URI
-                csv_data = final_df.to_csv(index=False)
-                encoded_csv = urllib.parse.quote(csv_data)
-                
-                download_html = f'<a href="data:text/csv;charset=utf-8,{encoded_csv}" download="processed_survey_data.csv" class="download-btn">Download Processed CSV</a>'
-                js.document.getElementById("download-container").innerHTML = download_html
-                js.set_status("Combined CSV Generated!", "ready")
-            except Exception as e:
-                # Displays exact Python exception message in the status bar if something breaks
-                js.set_status(f"Error processing files: {str(e)}", "error")
-
-        async def generate_report(event):
-            file1 = js.document.getElementById("csv1").files.item(0)
-            file2 = js.document.getElementById("csv2").files.item(0)
-            file3 = js.document.getElementById("csv3").files.item(0)
-
-            if not file1 or not file2:
-                js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
-                return
-
-            js.set_status("Generating Analysis Report...", "loading")
-            
-            try:
-                final_df = await process_all_surveys(file1, file2, file3)
-
-                js.document.getElementById("report-container").innerHTML = f"""
-                    <h3>Summary Analysis</h3>
-                    <p>Total Unique Participants: <b>{len(final_df):,}</b></p>
-                    <p>Total Processed Columns: <b>{len(final_df.columns):,}</b></p>
-                """
-                js.set_status("Summary Report Generated!", "ready")
-            except Exception as e:
-                js.set_status(f"Error generating report: {str(e)}", "error")
-    </script>
+    <script type="py" src="web/app.py"></script>
 </body>
 </html>

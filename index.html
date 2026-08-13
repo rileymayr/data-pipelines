@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
     <py-config>
         packages = ["pandas"]
@@ -102,6 +103,15 @@
             background-color: #1f6391;
         }
 
+        .btn-danger {
+            background-color: #e8a0a0;
+            color: #6f1d1d;
+        }
+
+        .btn-danger:hover {
+            background-color: #d98787;
+        }
+
         .status {
             display: inline-block;
             font-weight: bold;
@@ -141,60 +151,41 @@
             background-color: #71368a;
         }
 
-        .chart-controls {
-            display: flex;
-            align-items: end;
-            gap: 12px;
+        .chart-builder {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(180px, 1fr));
+            gap: 12px 18px;
             max-width: 800px;
-            margin: 20px 0 10px;
+            margin: 20px 0;
         }
 
-        .chart-controls label {
+        .chart-builder label {
             display: flex;
             flex-direction: column;
             gap: 5px;
             font-weight: 600;
-            flex: 1;
         }
 
-        .chart-controls select {
+        .chart-builder input,
+        .chart-builder select {
             padding: 8px;
             font-size: 14px;
         }
 
-        .column-picker {
+        .chart-builder .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .plot-card {
+            width: 100%;
             max-width: 800px;
-            border: 1px solid #d6d6d6;
-            border-radius: 6px;
-            background: #fafafa;
+            margin-top: 25px;
         }
 
-        .column-filter {
-            width: calc(100% - 24px);
-            margin: 12px;
-            padding: 8px;
-            box-sizing: border-box;
-            font-size: 14px;
-        }
-
-        #column-list {
-            max-height: 260px;
-            overflow-y: auto;
-            columns: 3;
-            column-gap: 25px;
-            margin: 0;
-            padding: 0 12px 12px 32px;
-        }
-
-        #column-list li {
-            break-inside: avoid;
-            padding: 3px 0;
-        }
-
-        .picker-actions {
+        .chart-toolbar {
             display: flex;
-            gap: 8px;
-            padding: 0 12px 12px;
+            justify-content: flex-end;
+            margin-bottom: 5px;
         }
 
         .btn-small {
@@ -202,11 +193,20 @@
             font-size: 12px;
         }
 
-        .plot-card {
+        .plot-area {
             width: 100%;
-            max-width: 800px;
             height: 450px;
-            margin-top: 25px;
+        }
+
+        .chart-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .chart-action-group {
+            display: flex;
+            gap: 8px;
         }
     </style>
 </head>
@@ -237,7 +237,7 @@
     </div>
 
     <div class="button-group">
-        <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Create CSV for Analysis</button>
+        <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Combine Datafiles</button>
         <button id="btn-demographics" class="btn btn-secondary" py-click="create_demographics_zip">Create Demographics ZIP</button>
         <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
     </div>
@@ -252,30 +252,39 @@
     <br>
     <section id="chart-section" hidden>
         <h3>Processed Data Columns</h3>
-        <p>Choose columns to chart. Generated weekly columns are hidden. For scatterplots, the first selected column is X and the second is Y.</p>
-        <div class="column-picker">
-            <input id="column-filter" class="column-filter" type="search" placeholder="Filter columns..."
-                   oninput="filter_columns(this.value)">
-            <ul id="column-list"></ul>
-            <div class="picker-actions">
-                <button type="button" class="btn btn-small" onclick="set_all_columns(true)">Select all</button>
-                <button type="button" class="btn btn-small" onclick="set_all_columns(false)">Clear</button>
-            </div>
-        </div>
-        <div class="chart-controls">
-            <label for="plot-type">Plot type:
-                <select id="plot-type">
+        <p><span id="column-count">0</span> chartable columns available. Type into a field or choose a column from the suggestions.</p>
+        <div class="chart-builder">
+            <label>Chart type
+                <select id="plot-type" onchange="update_chart_fields()">
                     <option value="bar">Bar</option>
                     <option value="histogram">Histogram</option>
                     <option value="scatterplot">Scatterplot</option>
                     <option value="violin">Violin</option>
                 </select>
             </label>
-            <button id="btn-chart" class="btn btn-secondary" py-click="create_selected_plots">Create Selected Plots</button>
+            <label>Figure title (optional)
+                <input id="chart-title" type="text" placeholder="My chart title">
+            </label>
+            <label id="x-field">X-axis
+                <input id="chart-x" list="column-options" placeholder="Choose or type a column">
+            </label>
+            <label id="y-field">Y-axis
+                <input id="chart-y" list="column-options" placeholder="Choose or type a column">
+            </label>
+            <label class="full-width">Group / Plotly color (optional)
+                <input id="chart-color" list="column-options" placeholder="Split the chart by this column">
+            </label>
+            <datalist id="column-options"></datalist>
+            <div class="full-width chart-actions">
+                <button id="btn-chart" class="btn btn-secondary" py-click="create_chart">Add Chart</button>
+                <span class="chart-action-group">
+                    <button id="btn-download-charts" type="button" class="btn btn-secondary" onclick="download_all_charts()">Download All Charts</button>
+                    <button id="btn-clear-charts" type="button" class="btn btn-danger" onclick="clear_all_charts()">Clear All Charts</button>
+                </span>
+            </div>
         </div>
         <div id="plot-container"></div>
     </section>
-
     <script>
         function set_status(message, kind) {
             const status = document.getElementById("output-status");
@@ -290,17 +299,78 @@
             set_status("Status: Ready to Process", "ready");
         });
 
-        function filter_columns(search_text) {
-            const search = search_text.toLowerCase();
-            document.querySelectorAll("#column-list li").forEach((item) => {
-                item.hidden = !item.dataset.column.toLowerCase().includes(search);
-            });
+        function update_chart_fields() {
+            const chartType = document.getElementById("plot-type").value;
+            document.getElementById("y-field").hidden = chartType === "histogram";
         }
 
-        function set_all_columns(checked) {
-            document.querySelectorAll("#column-list input[type=checkbox]")
-                .forEach((checkbox) => checkbox.checked = checked);
+        function delete_chart(plot_id, card_id) {
+            if (window.Plotly) window.Plotly.purge(plot_id);
+            const card = document.getElementById(card_id);
+            if (card) card.remove();
         }
+
+        function clear_all_charts() {
+            document.querySelectorAll("#plot-container .plot-area").forEach((plot) => {
+                if (window.Plotly) window.Plotly.purge(plot);
+            });
+            document.getElementById("plot-container").innerHTML = "";
+        }
+
+        async function download_all_charts() {
+            const plots = Array.from(document.querySelectorAll("#plot-container .plot-area"));
+            if (!plots.length) {
+                set_status("There are no charts to download.", "error");
+                return;
+            }
+
+            try {
+                const zip = new JSZip();
+                const usedNames = new Set();
+                for (let index = 0; index < plots.length; index++) {
+                    const plot = plots[index];
+                    let title = plot.parentElement && plot.parentElement.dataset.chartTitle;
+                    if (!title) title = plot.layout && plot.layout.title;
+                    if (title && typeof title === "object") title = title.text;
+                    let baseName = String(title || `chart-${index + 1}`)
+                        .trim()
+                        .replace(/[<>:"/\\|?*]+/g, "-")
+                        .replace(/\s+/g, "-")
+                        .replace(/-+/g, "-")
+                        .replace(/^-|-$/g, "")
+                        .slice(0, 100) || `chart-${index + 1}`;
+                    const firstTraceType = plot.data && plot.data[0] && plot.data[0].type;
+                    const figureType = firstTraceType === "scatter"
+                        ? "scatterplot"
+                        : (firstTraceType || "chart");
+                    let fileName = `${baseName}-${figureType}`;
+                    let copyNumber = 2;
+                    while (usedNames.has(fileName.toLowerCase())) {
+                        fileName = `${baseName}-${figureType}-${copyNumber++}`;
+                    }
+                    usedNames.add(fileName.toLowerCase());
+
+                    const image = await Plotly.toImage(plots[index], {
+                        format: "png",
+                        width: 1200,
+                        height: 700,
+                        scale: 2
+                    });
+                    zip.file(`${fileName}.png`, image.split(",")[1], {base64: true});
+                }
+                const blob = await zip.generateAsync({type: "blob"});
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = "charts.zip";
+                link.click();
+                URL.revokeObjectURL(link.href);
+                set_status(`Downloaded ${plots.length} chart(s).`, "ready");
+            } catch (error) {
+                set_status(`Error downloading charts: ${error}`, "error");
+            }
+        }
+
+        update_chart_fields();
     </script>
 
     <script type="py" src="web/app.py"></script>

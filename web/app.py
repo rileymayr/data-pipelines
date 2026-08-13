@@ -13,6 +13,7 @@ from analysis.demographics import create_demographics_zip as build_demographics_
 
 
 combined_df = None
+chart_counter = 0
 
 
 def _file(element_id):
@@ -42,19 +43,15 @@ async def get_combined_df():
 
 
 def _show_columns(dataframe):
-    """Populate the visible column list and chart selector after processing."""
+    """Populate the searchable column suggestions after processing."""
 
     columns = get_column_names(dataframe)
-    items = "".join(
-        "<li data-column=\"{0}\">"
-        '<label><input type="checkbox" name="chart-column" value="{0}"> {1}</label>'
-        "</li>".format(
-            html.escape(column, quote=True),
-            html.escape(column),
-        )
+    options = "".join(
+        f'<option value="{html.escape(column, quote=True)}"></option>'
         for column in columns
     )
-    js.document.getElementById("column-list").innerHTML = items
+    js.document.getElementById("column-options").innerHTML = options
+    js.document.getElementById("column-count").innerText = str(len(columns))
     js.document.getElementById("chart-section").hidden = False
 
 
@@ -107,34 +104,41 @@ async def generate_report(event):
         js.set_status(f"Error generating report: {error}", "error")
 
 
-async def create_selected_plots(event):
-    """Render Plotly charts for the checked columns and selected plot type."""
+async def create_chart(event):
+    """Add one configured Plotly chart to the top of the chart stack."""
+    global chart_counter
 
     try:
         final_df = await get_combined_df()
-        checkboxes = js.document.querySelectorAll(
-            '#column-list input[name="chart-column"]:checked'
-        )
-        selected_columns = [
-            str(checkboxes.item(index).value)
-            for index in range(checkboxes.length)
-        ]
         plot_type = str(js.document.getElementById("plot-type").value)
-        plot = build_plot(final_df, plot_type, selected_columns)
-        traces = plot.get("traces", [plot["trace"]])
+        x_column = str(js.document.getElementById("chart-x").value).strip()
+        y_column = str(js.document.getElementById("chart-y").value).strip()
+        color_column = str(js.document.getElementById("chart-color").value).strip()
+        title = str(js.document.getElementById("chart-title").value).strip()
+        plot = build_plot(final_df, plot_type, x_column, y_column, color_column, title)
+        traces = plot["traces"]
 
         plot_container = js.document.getElementById("plot-container")
-        plot_container.innerHTML = "".join(
-            f'<div id="plot-{index}" class="plot-card"></div>'
-            for index in range(len(traces))
+        chart_number = chart_counter
+        chart_counter += 1
+        plot_id = f"plot-{chart_number}"
+        card_id = f"chart-card-{chart_number}"
+        chart_title = html.escape(str(plot["layout"]["title"]), quote=True)
+        plot_container.insertAdjacentHTML(
+            "afterbegin",
+            f'<section id="{card_id}" class="plot-card" data-chart-title="{chart_title}">'
+            f'<div class="chart-toolbar">'
+            f'<button type="button" class="btn btn-small" '
+            f'onclick="delete_chart(\'{plot_id}\', \'{card_id}\')">'
+            "Delete chart</button></div>"
+            f'<div id="{plot_id}" class="plot-area"></div></section>',
         )
         config = js.JSON.parse(json.dumps({"responsive": True}))
-        for index, trace in enumerate(traces):
-            # Plotly.js needs native JavaScript objects, not Python dict proxies.
-            data = js.JSON.parse(json.dumps([trace]))
-            layout = js.JSON.parse(json.dumps(plot["layout"]))
-            js.Plotly.newPlot(f"plot-{index}", data, layout, config)
+        # Plotly.js needs native JavaScript objects, not Python dict proxies.
+        data = js.JSON.parse(json.dumps(traces))
+        layout = js.JSON.parse(json.dumps(plot["layout"]))
+        js.Plotly.newPlot(plot_id, data, layout, config)
 
-        js.set_status(f"Created {len(traces)} {plot_type} chart(s).", "ready")
+        js.set_status(f"Added {plot_type} chart.", "ready")
     except Exception as error:
-        js.set_status(f"Error creating bar chart: {error}", "error")
+        js.set_status(f"Error creating chart: {error}", "error")

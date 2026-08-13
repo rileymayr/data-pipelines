@@ -14,7 +14,7 @@
 
     <!-- PyScript configuration -->
     <py-config>
-        packages = ["plotly", "pandas"]
+        packages = ["pandas"]
 
         [files]
         "analysis/__init__.py" = "./analysis/__init__.py"
@@ -162,6 +162,9 @@
         <label for="csv2">Weekly Survey File:</label>
         <input type="file" id="csv2" accept=".csv">
 
+        <label for="csv-static">Static Weekly Columns File:</label>
+        <input type="file" id="csv-static" accept=".csv">
+
         <label for="csv3">Assessment Scores File:</label>
         <input type="file" id="csv3" accept=".csv">
     </div>
@@ -205,6 +208,7 @@
             file1 = js.document.getElementById("csv1").files.item(0)
             file2 = js.document.getElementById("csv2").files.item(0)
             file3 = js.document.getElementById("csv3").files.item(0)
+            static_cols_file = js.document.getElementById("csv-static").files.item(0)
 
             if not file1 or not file2:
                 js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
@@ -214,7 +218,9 @@
             
             try:
                 # Call your orchestrator function from data_utils.py
-                final_df = await process_all_surveys(file1, file2, file3)
+                final_df = await process_all_surveys(
+                    file1, file2, file3, static_cols_file=static_cols_file
+                )
                 
                 # Convert DataFrame to a downloadable CSV Data URI
                 csv_data = final_df.to_csv(index=False)
@@ -231,6 +237,7 @@
             file1 = js.document.getElementById("csv1").files.item(0)
             file2 = js.document.getElementById("csv2").files.item(0)
             file3 = js.document.getElementById("csv3").files.item(0)
+            static_cols_file = js.document.getElementById("csv-static").files.item(0)
 
             if not file1 or not file2:
                 js.set_status("Error: Please select at least Baseline and Weekly CSV files.", "error")
@@ -239,7 +246,9 @@
             js.set_status("Generating Analysis Report...", "loading")
             
             try:
-                final_df = await process_all_surveys(file1, file2, file3)
+                final_df = await process_all_surveys(
+                    file1, file2, file3, static_cols_file=static_cols_file
+                )
 
                 js.document.getElementById("report-container").innerHTML = f"""
                     <h3>Summary Analysis</h3>

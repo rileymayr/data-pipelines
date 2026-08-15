@@ -1,0 +1,363 @@
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 30px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .file-upload-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, max-content) 300px;
+            gap: 15px 30px;
+            align-items: center;
+            max-width: 600px;
+            margin-bottom: 25px;
+        }
+
+        .file-upload-grid label {
+            font-weight: 600;
+        }
+
+        #upload-details {
+            margin-bottom: 15px;
+        }
+
+        #upload-details summary {
+            width: fit-content;
+            padding: 6px 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #2980b9;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #219150;
+        }
+
+        .btn-secondary {
+            background-color: #2980b9;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #1f6391;
+        }
+
+        .btn-download {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background-color: #219150;
+        }
+
+        .btn-danger {
+            background-color: #e8a0a0;
+            color: #6f1d1d;
+        }
+
+        .btn-danger:hover {
+            background-color: #d98787;
+        }
+
+        .status {
+            display: inline-block;
+            font-weight: bold;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #d6d6d6;
+            background: #f7f7f7;
+            color: #333;
+        }
+        .status.loading {
+            background: #fff7d6;
+            border-color: #e8c76d;
+            color: #7a5a00;
+        }
+        .status.ready {
+            background: #e8f7ee;
+            border-color: #9ad3b0;
+            color: #1d6b3d;
+        }
+        .status.error {
+            background: #fdeaea;
+            border-color: #d88a8a;
+            color: #8a1f1f;
+        }
+
+        .download-btn {
+            display: inline-block;
+            padding: 10px 18px;
+            background-color: #27ae60;
+            border: 1px solid #27ae60;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .download-btn:hover {
+            background-color: #219150;
+            color: white;
+        }
+
+        .top-half {
+            position: relative;
+            padding-top: 8px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .top-status {
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        .top-downloads {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .top-downloads[hidden] {
+            display: none;
+        }
+
+        .chart-builder {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(180px, 1fr));
+            gap: 12px 18px;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .chart-builder label {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-weight: 600;
+        }
+
+        #chart-section h3 {
+            margin-top: 0;
+        }
+
+        #report-container,
+        #chart-section {
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .chart-builder input,
+        .chart-builder select {
+            padding: 8px;
+            font-size: 14px;
+        }
+
+        .combobox {
+            position: relative;
+            display: flex;
+        }
+
+        .combobox input {
+            width: 100%;
+            padding-right: 36px;
+        }
+
+        .combobox-toggle {
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            bottom: 1px;
+            width: 32px;
+            padding: 0;
+            border: none;
+            border-left: 1px solid #d6d6d6;
+            border-radius: 0 3px 3px 0;
+            background: #f7f7f7;
+            color: #555;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .combobox-toggle:hover,
+        .combobox-toggle:focus-visible {
+            background: #e9e9e9;
+        }
+
+        .combobox-options {
+            position: absolute;
+            z-index: 10;
+            top: calc(100% + 2px);
+            left: 0;
+            right: 0;
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 4px 0;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            background: white;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .combobox-option {
+            display: block;
+            width: 100%;
+            padding: 6px 9px;
+            border: none;
+            background: white;
+            color: #333;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .combobox-option:hover,
+        .combobox-option:focus {
+            background: #eaf3f8;
+            outline: none;
+        }
+
+        .combobox-empty {
+            padding: 6px 9px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .chart-builder .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .plot-card {
+            width: 100%;
+            max-width: 800px;
+            margin: 25px auto 0;
+        }
+
+        .chart-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 5px;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .plot-area {
+            width: 100%;
+            height: 450px;
+        }
+
+        .network-plot-area {
+            width: 100%;
+            height: 700px;
+        }
+
+        #network-section {
+            max-width: 1100px;
+            margin: 30px auto 0;
+        }
+
+        .network-controls {
+            display: flex;
+            gap: 18px;
+            align-items: end;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .network-controls label {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-weight: 600;
+        }
+
+        .network-download-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: stretch;
+            margin-left: auto;
+        }
+
+        .network-visualize-control {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #network-classes {
+            min-width: 160px;
+            min-height: 90px;
+        }
+
+        .chart-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .analysis-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            max-width: 1100px;
+            margin: 25px auto 0;
+            border-bottom: 1px solid #d6d6d6;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            background: #f1f1f1;
+            color: #444;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .tab-btn.active,
+        .tab-btn:hover {
+            background: #2980b9;
+            color: white;
+        }
+
+        .chart-action-group {
+            display: flex;
+            gap: 8px;
+        }

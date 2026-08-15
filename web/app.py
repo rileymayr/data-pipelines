@@ -187,7 +187,7 @@ def _network_plot(network):
         angle = (2 * math.pi * index / count) - math.pi / 2
         positions[node["id"]] = (radius * math.cos(angle), radius * math.sin(angle))
 
-    area = max(40.0, count * 12.0)
+    area = max(25.0, count * 8.0)
     ideal_distance = math.sqrt(area / count)
     for _ in range(140):
         displacement = {node_id: [0.0, 0.0] for node_id in node_ids}
@@ -197,7 +197,7 @@ def _network_plot(network):
                 right_x, right_y = positions[right_id]
                 dx, dy = left_x - right_x, left_y - right_y
                 distance = max(0.05, math.hypot(dx, dy))
-                force = 1.6 * (ideal_distance * ideal_distance) / distance
+                force = (ideal_distance * ideal_distance) / distance
                 push_x, push_y = dx / distance * force, dy / distance * force
                 displacement[left_id][0] += push_x
                 displacement[left_id][1] += push_y
@@ -209,7 +209,7 @@ def _network_plot(network):
             target_x, target_y = positions[target]
             dx, dy = target_x - source_x, target_y - source_y
             distance = max(0.05, math.hypot(dx, dy))
-            force = (distance * distance / ideal_distance) * (0.008 + min(strength, 8) * 0.002)
+            force = (distance * distance / ideal_distance) * (0.015 + min(strength, 8) * 0.004)
             pull_x, pull_y = dx / distance * force, dy / distance * force
             displacement[source][0] += pull_x
             displacement[source][1] += pull_y
@@ -228,25 +228,6 @@ def _network_plot(network):
                 x + step_x / step * min(step, limit),
                 y + step_y / step * min(step, limit),
             )
-
-        # Keep nodes from becoming coincident inside dense clusters.
-        minimum_distance = ideal_distance * 0.72
-        for left_index, left_id in enumerate(node_ids):
-            for right_id in node_ids[left_index + 1:]:
-                left_x, left_y = positions[left_id]
-                right_x, right_y = positions[right_id]
-                dx, dy = right_x - left_x, right_y - left_y
-                distance = math.hypot(dx, dy)
-                if distance >= minimum_distance:
-                    continue
-                if distance < 0.05:
-                    angle = (left_index + 1) * 0.73
-                    dx, dy = math.cos(angle), math.sin(angle)
-                    distance = 1.0
-                separation = (minimum_distance - distance) / (2 * distance)
-                shift_x, shift_y = dx * separation, dy * separation
-                positions[left_id] = (left_x - shift_x, left_y - shift_y)
-                positions[right_id] = (right_x + shift_x, right_y + shift_y)
 
     # Normalize coordinates for a consistent Plotly viewport.
     max_coordinate = max(

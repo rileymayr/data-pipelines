@@ -197,6 +197,36 @@
             height: 450px;
         }
 
+        .network-plot-area {
+            width: 100%;
+            height: 700px;
+        }
+
+        #network-section {
+            max-width: 1100px;
+            margin-top: 30px;
+        }
+
+        .network-controls {
+            display: flex;
+            gap: 18px;
+            align-items: end;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .network-controls label {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-weight: 600;
+        }
+
+        #network-classes {
+            min-width: 160px;
+            min-height: 90px;
+        }
+
         .chart-actions {
             display: flex;
             justify-content: space-between;
@@ -278,6 +308,24 @@
             </div>
         </div>
         <div id="plot-container"></div>
+    </section>
+
+    <section id="network-section" hidden>
+        <h3>Student Study-Group Network</h3>
+        <p>Students are connected when they appeared together in a reported Group 1 or Group 2 study group. Edge width shows how many times that connection was reported.</p>
+        <div class="network-controls">
+            <label for="network-week">Starting week
+                <input id="network-week" type="range" min="1" max="3" value="1" step="1"
+                    oninput="document.getElementById('network-week-label').innerText = 'Week ' + this.value">
+                <span id="network-week-label">Week 1</span>
+            </label>
+            <label for="network-classes">Class numbers
+                <select id="network-classes" multiple></select>
+            </label>
+            <button id="btn-network" class="btn btn-secondary" py-click="create_network_graph">Create Network</button>
+            <span id="network-download-container"></span>
+        </div>
+        <div id="network-plot-container"></div>
     </section>
     <script>
         function set_status(message, kind) {

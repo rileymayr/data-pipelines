@@ -6,9 +6,14 @@ import json
 import urllib.parse
 
 import js
+import pandas as pd
 
 from analysis.chart_utils import build_plot, get_column_names
-from analysis.data_utils import load_static_columns, process_all_surveys
+from analysis.data_utils import (
+    build_student_network,
+    load_static_columns,
+    process_all_surveys,
+)
 from analysis.demographics import create_demographics_zip as build_demographics_zip
 
 
@@ -53,6 +58,15 @@ def _show_columns(dataframe):
     js.document.getElementById("column-options").innerHTML = options
     js.document.getElementById("column-count").innerText = str(len(columns))
     js.document.getElementById("chart-section").hidden = False
+    class_options = sorted(
+        dataframe.get("Class Number", pd.Series(dtype=object))
+        .dropna().astype(str).str.replace(r"\.0$", "", regex=True).unique()
+    )
+    js.document.getElementById("network-classes").innerHTML = "".join(
+        f'<option value="{html.escape(value, quote=True)}" selected>{html.escape(value)}</option>'
+        for value in class_options
+    )
+    js.document.getElementById("network-section").hidden = False
 
 
 async def create_csv(event):
@@ -142,3 +156,228 @@ async def create_chart(event):
         js.set_status(f"Added {plot_type} chart.", "ready")
     except Exception as error:
         js.set_status(f"Error creating chart: {error}", "error")
+
+
+def _network_plot(network):
+    """Create stable force-directed positions, Plotly traces, and week frames."""
+    import math
+
+    nodes = network["nodes"]
+    positions = {}
+    node_ids = [node["id"] for node in nodes]
+    count = max(1, len(nodes))
+
+    # Aggregate all weeks for the layout so the graph represents the overall
+    # structure while the displayed edges can still change with the slider.
+    layout_edges = {}
+    for week_edges in network["edges_by_week"].values():
+        for edge in week_edges:
+            key = tuple(sorted((edge["source"], edge["target"])))
+            layout_edges[key] = layout_edges.get(key, 0) + edge["strength"]
+
+    # Small deterministic force-directed layout. This avoids an additional
+    # browser package while producing readable clusters for the survey-sized
+    # networks this app handles.
+    radius = max(1.0, math.sqrt(count) * 1.5)
+    for index, node in enumerate(nodes):
+        angle = (2 * math.pi * index / count) - math.pi / 2
+        positions[node["id"]] = (radius * math.cos(angle), radius * math.sin(angle))
+
+    area = max(25.0, count * 8.0)
+    ideal_distance = math.sqrt(area / count)
+    for _ in range(140):
+        displacement = {node_id: [0.0, 0.0] for node_id in node_ids}
+        for left_index, left_id in enumerate(node_ids):
+            left_x, left_y = positions[left_id]
+            for right_id in node_ids[left_index + 1:]:
+                right_x, right_y = positions[right_id]
+                dx, dy = left_x - right_x, left_y - right_y
+                distance = max(0.05, math.hypot(dx, dy))
+                force = (ideal_distance * ideal_distance) / distance
+                push_x, push_y = dx / distance * force, dy / distance * force
+                displacement[left_id][0] += push_x
+                displacement[left_id][1] += push_y
+                displacement[right_id][0] -= push_x
+                displacement[right_id][1] -= push_y
+
+        for (source, target), strength in layout_edges.items():
+            source_x, source_y = positions[source]
+            target_x, target_y = positions[target]
+            dx, dy = target_x - source_x, target_y - source_y
+            distance = max(0.05, math.hypot(dx, dy))
+            force = (distance * distance / ideal_distance) * (0.015 + min(strength, 8) * 0.004)
+            pull_x, pull_y = dx / distance * force, dy / distance * force
+            displacement[source][0] += pull_x
+            displacement[source][1] += pull_y
+            displacement[target][0] -= pull_x
+            displacement[target][1] -= pull_y
+
+        for node_id in node_ids:
+            x, y = positions[node_id]
+            # Keep the whole layout centered and prevent extreme outliers.
+            displacement[node_id][0] -= x * 0.004
+            displacement[node_id][1] -= y * 0.004
+            step_x, step_y = displacement[node_id]
+            step = max(0.05, math.hypot(step_x, step_y))
+            limit = 0.28
+            positions[node_id] = (
+                x + step_x / step * min(step, limit),
+                y + step_y / step * min(step, limit),
+            )
+
+    # Normalize coordinates for a consistent Plotly viewport.
+    max_coordinate = max(
+        (max(abs(x), abs(y)) for x, y in positions.values()), default=1.0
+    )
+    scale = 10.0 / max(1.0, max_coordinate)
+    positions = {
+        node_id: (x * scale, y * scale)
+        for node_id, (x, y) in positions.items()
+    }
+
+    classes = sorted({node["class_number"] for node in nodes})
+    palette = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    class_colors = {value: palette[index % len(palette)] for index, value in enumerate(classes)}
+    node_trace = {
+        "type": "scatter",
+        "mode": "markers+text",
+        "x": [positions[node["id"]][0] for node in nodes],
+        "y": [positions[node["id"]][1] for node in nodes],
+        "text": [node["label"] for node in nodes],
+        "textposition": "top center",
+        "textfont": {"size": 10},
+        "hovertemplate": "%{text}<br>Class: %{customdata}<extra></extra>",
+        "customdata": [node["class_number"] for node in nodes],
+        "marker": {
+            "size": 14,
+            "color": [class_colors[node["class_number"]] for node in nodes],
+            "line": {"width": 1, "color": "white"},
+        },
+        "name": "Students",
+    }
+
+    all_edge_keys = sorted({
+        (edge["source"], edge["target"], edge["group_number"])
+        for edges in network["edges_by_week"].values()
+        for edge in edges
+    }, key=lambda key: (key[0].casefold(), key[1].casefold(), key[2]))
+    parallel_pairs = {
+        (source, target)
+        for source, target, _group_number in all_edge_keys
+        if sum(
+            1 for edge_source, edge_target, _ in all_edge_keys
+            if edge_source == source and edge_target == target
+        ) > 1
+    }
+
+    def edge_traces(week):
+        week_lookup = {
+            (edge["source"], edge["target"], edge["group_number"]): edge
+            for edge in network["edges_by_week"].get(str(week), [])
+        }
+        traces = []
+        for source, target, group_number in all_edge_keys:
+            edge_data = week_lookup.get((source, target, group_number))
+            offset = 0.12 if (source, target) in parallel_pairs else 0.0
+            if group_number == 1:
+                offset = -offset
+            source_x, source_y = positions[source]
+            target_x, target_y = positions[target]
+            dx, dy = target_x - source_x, target_y - source_y
+            distance = max(0.05, math.hypot(dx, dy))
+            offset_x, offset_y = -dy / distance * offset, dx / distance * offset
+            traces.append({
+                "type": "scatter", "mode": "lines",
+                "x": [source_x + offset_x, target_x + offset_x, None] if edge_data else [],
+                "y": [source_y + offset_y, target_y + offset_y, None] if edge_data else [],
+                "line": {
+                    "width": min(1 + (edge_data["strength"] if edge_data else 0) * 1.5, 12),
+                    "dash": "dash" if group_number == 2 else "solid",
+                    "color": "#777",
+                },
+                "hoverinfo": "skip",
+                "name": f"Group {group_number}",
+            })
+        return traces
+
+    weeks = sorted(int(week) for week in network["edges_by_week"])
+    traces = edge_traces(weeks[0]) + [node_trace] if weeks else [node_trace]
+    frames = [
+        {"name": f"W{week}", "data": edge_traces(week) + [node_trace]}
+        for week in weeks
+    ]
+    slider_steps = [
+        {"label": f"Week {week}", "method": "animate", "args": [[f"W{week}"], {"mode": "immediate"}]}
+        for week in weeks
+    ]
+    layout = {
+        "title": "Student Study-Group Network",
+        "showlegend": False,
+        "hovermode": "closest",
+        "xaxis": {"visible": False}, "yaxis": {"visible": False, "scaleanchor": "x"},
+        "margin": {"l": 20, "r": 20, "t": 70, "b": 70},
+        "plot_bgcolor": "#fafafa",
+        "updatemenus": [{"type": "buttons", "showactive": False, "x": 0, "y": 1.12,
+                         "buttons": [{"label": "Play weeks", "method": "animate",
+                                      "args": [None, {"fromcurrent": True, "frame": {"duration": 900}}]}]}],
+        "sliders": [{"active": 0, "currentvalue": {"prefix": "Displayed: "}, "steps": slider_steps}],
+    }
+    return {"traces": traces, "frames": frames, "layout": layout}
+
+
+async def create_network_graph(event):
+    """Render the weekly undirected study-group network and offer its edge list."""
+    try:
+        final_df = await get_combined_df()
+        week = int(js.document.getElementById("network-week").value)
+        class_select = js.document.getElementById("network-classes")
+        classes = [str(option.value) for option in class_select.options if option.selected]
+        network = build_student_network(final_df, weeks=[1, 2, 3], class_numbers=classes)
+        plot = _network_plot(network)
+        plot_id = "student-network-plot"
+        js.document.getElementById("network-plot-container").innerHTML = (
+            f'<div id="{plot_id}" class="network-plot-area"></div>'
+        )
+        js.Plotly.newPlot(
+            plot_id,
+            js.JSON.parse(json.dumps(plot["traces"])),
+            js.JSON.parse(json.dumps(plot["layout"])),
+            js.JSON.parse(json.dumps({"responsive": True})),
+        )
+        js.Plotly.addFrames(plot_id, js.JSON.parse(json.dumps(plot["frames"])))
+        js.Plotly.animate(plot_id, f"W{week}", {"mode": "immediate", "transition": {"duration": 0}})
+
+        encoded_csv = urllib.parse.quote(
+            pd.DataFrame(network["edges"]).to_csv(index=False)
+            if network["edges"] else "week,source_class,target_class,source,target,strength,group_2\n"
+        )
+        js.document.getElementById("network-download-container").innerHTML = (
+            f'<a href="data:text/csv;charset=utf-8,{encoded_csv}" '
+            'download="student_network_edges.csv" class="download-btn">'
+            "Download Network CSV</a>"
+        )
+        js.set_status("Student network generated.", "ready")
+    except Exception as error:
+        js.set_status(f"Error creating student network: {error}", "error")
+
+
+async def download_network_htmls(event):
+    """Prepare one interactive Plotly HTML figure per class for ZIP download."""
+    try:
+        final_df = await get_combined_df()
+        all_network = build_student_network(final_df, weeks=[1, 2, 3])
+        figures = {}
+        for class_number in all_network["class_numbers"]:
+            class_network = build_student_network(
+                final_df, weeks=[1, 2, 3], class_numbers=[class_number]
+            )
+            figures[str(class_number)] = _network_plot(class_network)
+
+        js.window.download_network_html_zip(
+            js.JSON.parse(json.dumps(figures))
+        )
+        js.set_status(
+            f"Prepared {len(figures)} class network HTML file(s).", "ready"
+        )
+    except Exception as error:
+        js.set_status(f"Error preparing network HTMLs: {error}", "error")

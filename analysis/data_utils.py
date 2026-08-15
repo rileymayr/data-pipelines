@@ -1,6 +1,8 @@
 import io
 import csv
 import re
+from itertools import combinations
+from collections import defaultdict
 import pandas as pd
 
 # Import pyodide for PyScript browser file handling
@@ -245,6 +247,123 @@ def pivot_weekly_survey_to_wide(
     final_df = pd.merge(static_df, pivoted, on=id_col, how="left")
 
     return final_df
+
+
+def build_student_network(
+    df: pd.DataFrame,
+    weeks: list[int] | None = None,
+    class_numbers: list[str] | None = None,
+) -> dict:
+    """Build an undirected student co-membership network from weekly group answers.
+
+    Each row's ``Group 1#...`` and ``Group 2#...`` answers are treated as the
+    members of one reported study group. Every pair in that response receives
+    one edge for that week. The node universe comes from those group answers,
+    rather than the respondent ``Name`` column, so non-responding students are
+    retained. The returned structure is Plotly-friendly and also contains an
+    edge list suitable for CSV export.
+    """
+    weeks = [int(week) for week in (weeks or [1, 2, 3])]
+    selected_classes = {str(value).strip() for value in (class_numbers or [])}
+
+    class_by_name: dict[str, str] = {}
+    for column in ["Class Number", "Class Number_W1", "Class Number_W2", "Class Number_W3"]:
+        if column not in df.columns:
+            continue
+        for name, value in zip(df["Name"], df[column]):
+            if pd.isna(name) or pd.isna(value) or str(name).strip() in class_by_name:
+                continue
+            class_by_name[str(name).strip()] = str(value).strip().removesuffix(".0")
+
+    group_columns = {
+        (week, group_number): [
+            column for column in df.columns
+            if re.match(
+                r"^Group " + str(group_number) + r"#.*_W" + str(week) + r"$",
+                str(column),
+            )
+        ]
+        for week in weeks
+        for group_number in (1, 2)
+    }
+    edges_by_week: dict[int, dict[tuple[str, str, int], dict]] = {}
+    all_network_names = set()
+
+    for week in weeks:
+        edge_counts: dict[tuple[str, str, int], dict] = {}
+        for _, row in df.iterrows():
+            row_class = row.get("Class Number")
+            if pd.isna(row_class):
+                row_class = row.get(f"Class Number_W{week}")
+            if pd.notna(row_class):
+                row_class = str(row_class).strip().removesuffix(".0")
+            for group_number in (1, 2):
+                members = {
+                    str(row[column]).strip()
+                    for column in group_columns[(week, group_number)]
+                    if column in row.index and pd.notna(row[column]) and str(row[column]).strip()
+                }
+                if row_class is not None and pd.notna(row_class):
+                    for member in members:
+                        class_by_name.setdefault(member, row_class)
+                if selected_classes:
+                    members = {
+                        member for member in members
+                        if class_by_name.get(member, "") in selected_classes
+                    }
+                all_network_names.update(members)
+                for source, target in combinations(sorted(members), 2):
+                    edge_key = (source, target, group_number)
+                    edge = edge_counts.setdefault(
+                        edge_key, {"strength": 0, "group_number": group_number}
+                    )
+                    edge["strength"] += 1
+        edges_by_week[week] = dict(edge_counts)
+
+    # Include every selected student even when they have no connections.
+    ordered_names = sorted(all_network_names, key=str.casefold)
+    node_records = [
+        {
+            "id": name,
+            "label": name,
+            "class_number": class_by_name.get(name, "Unknown"),
+        }
+        for name in ordered_names
+    ]
+    edge_records = []
+    for week, edge_counts in edges_by_week.items():
+        for (source, target, group_number), edge_data in edge_counts.items():
+            edge_records.append({
+                "week": week,
+                "source_class": class_by_name.get(source, "Unknown"),
+                "target_class": class_by_name.get(target, "Unknown"),
+                "source": source,
+                "target": target,
+                "strength": edge_data["strength"],
+                "group_number": group_number,
+                "group_2": group_number == 2,
+            })
+
+    return {
+        "nodes": node_records,
+        "edges": edge_records,
+        "edges_by_week": {
+            str(week): [
+                {
+                    "source": source,
+                    "target": target,
+                    "strength": edge_data["strength"],
+                    "group_number": edge_data["group_number"],
+                    "group_2": edge_data["group_number"] == 2,
+                }
+                for (source, target, _group_number), edge_data in edge_counts.items()
+            ]
+            for week, edge_counts in edges_by_week.items()
+        },
+        "class_numbers": sorted({
+            value for value in class_by_name.values() if value and value != "nan"
+        }),
+    }
 
 
 # --- Pipeline Orchestrator ---

@@ -25,7 +25,9 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 30px;
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 30px;
             line-height: 1.6;
             color: #333;
         }
@@ -43,10 +45,22 @@
             font-weight: 600;
         }
 
+        #upload-details {
+            margin-bottom: 15px;
+        }
+
+        #upload-details summary {
+            width: fit-content;
+            padding: 6px 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #2980b9;
+        }
+
         .button-group {
             display: flex;
             gap: 12px;
-            align-items: center;
+            align-items: flex-end;
             flex-wrap: wrap;
             margin-top: 10px;
         }
@@ -77,6 +91,15 @@
 
         .btn-secondary:hover {
             background-color: #1f6391;
+        }
+
+        .btn-download {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-download:hover {
+            background-color: #219150;
         }
 
         .btn-danger {
@@ -116,21 +139,23 @@
         .download-btn {
             display: inline-block;
             padding: 10px 18px;
-            background-color: transparent;
+            background-color: #27ae60;
             border: 1px solid #27ae60;
-            color: #222;
+            color: white;
             text-decoration: none;
             border-radius: 5px;
             font-weight: bold;
         }
         .download-btn:hover {
-            background-color: #e8f7ee;
-            color: #1d6b3d;
+            background-color: #219150;
+            color: white;
         }
 
         .top-half {
             position: relative;
             padding-top: 8px;
+            max-width: 1100px;
+            margin: 0 auto;
         }
 
         .top-status {
@@ -141,9 +166,15 @@
 
         .top-downloads {
             display: flex;
+            flex-direction: column;
+            align-items: flex-end;
             justify-content: flex-end;
             gap: 10px;
             margin-left: auto;
+        }
+
+        .top-downloads[hidden] {
+            display: none;
         }
 
         .chart-builder {
@@ -165,6 +196,13 @@
             margin-top: 0;
         }
 
+        #report-container,
+        #chart-section {
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         .chart-builder input,
         .chart-builder select {
             padding: 8px;
@@ -178,7 +216,7 @@
         .plot-card {
             width: 100%;
             max-width: 800px;
-            margin-top: 25px;
+            margin: 25px auto 0;
         }
 
         .chart-toolbar {
@@ -204,7 +242,7 @@
 
         #network-section {
             max-width: 1100px;
-            margin-top: 30px;
+            margin: 30px auto 0;
         }
 
         .network-controls {
@@ -222,6 +260,20 @@
             font-weight: 600;
         }
 
+        .network-download-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: stretch;
+            margin-left: auto;
+        }
+
+        .network-visualize-control {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         #network-classes {
             min-width: 160px;
             min-height: 90px;
@@ -231,6 +283,32 @@
             display: flex;
             justify-content: space-between;
             gap: 8px;
+        }
+
+        .analysis-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            max-width: 1100px;
+            margin: 25px auto 0;
+            border-bottom: 1px solid #d6d6d6;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            background: #f1f1f1;
+            color: #444;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .tab-btn.active,
+        .tab-btn:hover {
+            background: #2980b9;
+            color: white;
         }
 
         .chart-action-group {
@@ -244,25 +322,30 @@
     <div class="top-half">
         <h2>Data Analysis Pipeline</h2>
 
-        <div class="file-upload-grid">
-            <label for="csv1">Baseline Team Survey File:</label>
-            <input type="file" id="csv1" accept=".csv">
+        <details id="upload-details" open>
+            <summary>Survey data files</summary>
+            <div class="file-upload-grid">
+                <label for="csv1">Baseline Team Survey File:</label>
+                <input type="file" id="csv1" accept=".csv">
 
-            <label for="csv2">Weekly Survey File:</label>
-            <input type="file" id="csv2" accept=".csv">
+                <label for="csv2">Weekly Survey File:</label>
+                <input type="file" id="csv2" accept=".csv">
 
-            <label for="csv-static">Static Weekly Columns File:</label>
-            <input type="file" id="csv-static" accept=".csv">
+                <label for="csv-static">Static Weekly Columns File:</label>
+                <input type="file" id="csv-static" accept=".csv">
 
-            <label for="csv3">Assessment Scores File:</label>
-            <input type="file" id="csv3" accept=".csv">
-        </div>
+                <label for="csv3">Assessment Scores File:</label>
+                <input type="file" id="csv3" accept=".csv">
+            </div>
+        </details>
 
         <div class="button-group">
-            <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Combine Datafiles</button>
-            <button id="btn-demographics" class="btn btn-secondary" py-click="create_demographics_zip">Create Demographics ZIP</button>
-            <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
-            <div id="download-container" class="top-downloads"></div>
+            <button id="btn-csv" class="btn btn-secondary" py-click="create_csv">Combine Datafiles</button>
+            <div id="combined-download-actions" class="top-downloads" hidden>
+                <div id="download-container"></div>
+                <button id="btn-demographics" class="btn btn-download" py-click="create_demographics_zip">Create Demographics ZIP</button>
+                <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
+            </div>
         </div>
 
         <div class="top-status">
@@ -274,6 +357,10 @@
     <hr style="margin: 25px 0;">
 
     <div id="report-container"></div>
+    <div id="analysis-tabs" class="analysis-tabs" hidden>
+        <button id="tab-charts" class="tab-btn active" type="button" onclick="show_analysis_tab('charts')">Chart Maker</button>
+        <button id="tab-network" class="tab-btn" type="button" onclick="show_analysis_tab('network')">Network Visualizer</button>
+    </div>
     <section id="chart-section" hidden>
         <h3>Processed Data Columns</h3>
         <p><span id="column-count">0</span> chartable columns available. Type into a field or choose a column from the suggestions.</p>
@@ -302,7 +389,7 @@
             <div class="full-width chart-actions">
                 <button id="btn-chart" class="btn btn-secondary" py-click="create_chart">Add Chart</button>
                 <span class="chart-action-group">
-                    <button id="btn-download-charts" type="button" class="btn btn-secondary" onclick="download_all_charts()">Download All Charts</button>
+                    <button id="btn-download-charts" type="button" class="btn btn-download" onclick="download_all_charts()">Download All Charts</button>
                     <button id="btn-clear-charts" type="button" class="btn btn-danger" onclick="clear_all_charts()">Clear All Charts</button>
                 </span>
             </div>
@@ -314,16 +401,21 @@
         <h3>Student Study-Group Network</h3>
         <p>Students are connected when they appeared together in a reported Group 1 or Group 2 study group. Edge width shows how many times that connection was reported.</p>
         <div class="network-controls">
-            <label for="network-week">Starting week
-                <input id="network-week" type="range" min="1" max="3" value="1" step="1"
-                    oninput="document.getElementById('network-week-label').innerText = 'Week ' + this.value">
-                <span id="network-week-label">Week 1</span>
-            </label>
             <label for="network-classes">Class numbers
                 <select id="network-classes" multiple></select>
             </label>
-            <button id="btn-network" class="btn btn-secondary" py-click="create_network_graph">Create Network</button>
-            <span id="network-download-container"></span>
+            <div class="network-visualize-control">
+                <label for="network-week">Starting week
+                    <input id="network-week" type="range" min="1" max="3" value="1" step="1"
+                        oninput="document.getElementById('network-week-label').innerText = 'Week ' + this.value">
+                    <span id="network-week-label">Week 1</span>
+                </label>
+                <button id="btn-network" class="btn btn-secondary" py-click="create_network_graph">Visualize Network</button>
+            </div>
+            <div class="network-download-actions">
+                <button id="btn-network-csv" class="btn btn-download" py-click="download_network_csv">Download Network CSV</button>
+                <button id="btn-network-download" class="btn btn-download" py-click="download_network_htmls">Download All Network Visualizations</button>
+            </div>
         </div>
         <div id="network-plot-container"></div>
     </section>
@@ -342,6 +434,14 @@
         function update_chart_fields() {
             const chartType = document.getElementById("plot-type").value;
             document.getElementById("y-field").hidden = chartType === "histogram";
+        }
+
+        function show_analysis_tab(tab) {
+            const showNetwork = tab === "network";
+            document.getElementById("chart-section").hidden = showNetwork;
+            document.getElementById("network-section").hidden = !showNetwork;
+            document.getElementById("tab-charts").classList.toggle("active", !showNetwork);
+            document.getElementById("tab-network").classList.toggle("active", showNetwork);
         }
 
         function delete_chart(plot_id, card_id) {
@@ -427,6 +527,56 @@
                 set_status(`Downloaded ${plots.length} chart(s).`, "ready");
             } catch (error) {
                 set_status(`Error downloading charts: ${error}`, "error");
+            }
+        }
+
+        async function download_network_html_zip(figures) {
+            try {
+                const zip = new JSZip();
+                const usedNames = new Set();
+                const entries = Object.entries(figures);
+                for (const [classNumber, figure] of entries) {
+                    const baseName = `student-network-class-${String(classNumber)}`
+                        .replace(/[<>:"/\\|?*]+/g, "-")
+                        .replace(/\s+/g, "-");
+                    let fileName = `${baseName}.html`;
+                    let copyNumber = 2;
+                    while (usedNames.has(fileName.toLowerCase())) {
+                        fileName = `${baseName}-${copyNumber++}.html`;
+                    }
+                    usedNames.add(fileName.toLowerCase());
+
+                    const dataJson = JSON.stringify(figure.traces).replace(/</g, "\\u003c");
+                    const layoutJson = JSON.stringify(figure.layout).replace(/</g, "\\u003c");
+                    const framesJson = JSON.stringify(figure.frames).replace(/</g, "\\u003c");
+                    const html = [
+                        "<!doctype html>",
+                        "<html lang=\"en\"><head>",
+                        "<meta charset=\"utf-8\">",
+                        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+                        `<title>${baseName}</title>`,
+                        "<scr" + "ipt src=\"https://cdn.plot.ly/plotly-2.35.2.min.js\"></scr" + "ipt>",
+                        "</head><body>",
+                        "<div id=\"plot\" style=\"width:100%;height:95vh;\"></div>",
+                        "<scr" + "ipt>",
+                        `const data = ${dataJson};`,
+                        `const layout = ${layoutJson};`,
+                        `const frames = ${framesJson};`,
+                        "Plotly.newPlot(\"plot\", data, layout, {responsive: true}).then(() => Plotly.addFrames(\"plot\", frames));",
+                        "<" + "/script>",
+                        "</body></html>"
+                    ].join("\n");
+                    zip.file(fileName, html);
+                }
+                const blob = await zip.generateAsync({type: "blob"});
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = "student_networks_by_class.zip";
+                link.click();
+                URL.revokeObjectURL(link.href);
+                set_status(`Downloaded ${entries.length} class network HTML file(s).`, "ready");
+            } catch (error) {
+                set_status(`Error downloading network HTMLs: ${error}`, "error");
             }
         }
 

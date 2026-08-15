@@ -51,11 +51,7 @@ def _show_columns(dataframe):
     """Populate the searchable column suggestions after processing."""
 
     columns = get_column_names(dataframe)
-    options = "".join(
-        f'<option value="{html.escape(column, quote=True)}"></option>'
-        for column in columns
-    )
-    js.document.getElementById("column-options").innerHTML = options
+    js.set_column_options(js.JSON.parse(json.dumps(columns)))
     js.document.getElementById("column-count").innerText = str(len(columns))
     js.document.getElementById("chart-section").hidden = False
     class_options = sorted(

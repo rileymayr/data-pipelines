@@ -62,7 +62,7 @@ _BAR_AGGREGATIONS = {
 }
 
 
-def build_plot(
+def _build_single_plot(
     dataframe: pd.DataFrame,
     plot_type: str,
     x_column: str | None = None,
@@ -71,7 +71,7 @@ def build_plot(
     title: str | None = None,
     aggregation: str = "mean",
 ) -> dict:
-    """Build traces and layout for one configured chart."""
+    """Build traces and layout for one configured, non-faceted chart."""
 
     plot_type = plot_type.lower()
     x_column = x_column or None
@@ -198,3 +198,101 @@ def build_plot(
     if not traces:
         raise ValueError("The selected fields do not contain data to plot.")
     return {"traces": traces, "layout": layout}
+
+
+def build_plot(
+    dataframe: pd.DataFrame,
+    plot_type: str,
+    x_column: str | None = None,
+    y_column: str | None = None,
+    color_column: str | None = None,
+    title: str | None = None,
+    aggregation: str = "mean",
+    facet_row: str | None = None,
+    facet_column: str | None = None,
+) -> dict:
+    """Build a Plotly-compatible chart, optionally split into facet panels."""
+
+    facet_row = facet_row or None
+    facet_column = facet_column or None
+    if facet_row:
+        _require_column(dataframe, facet_row, "vertical facet")
+    if facet_column:
+        _require_column(dataframe, facet_column, "horizontal facet")
+    if facet_row and facet_column and facet_row == facet_column:
+        raise ValueError("Choose different columns for horizontal and vertical facets.")
+
+    if not facet_row and not facet_column:
+        return _build_single_plot(
+            dataframe, plot_type, x_column, y_column, color_column, title, aggregation
+        )
+
+    def facet_values(column):
+        return dataframe[column].fillna("Missing").astype(str).drop_duplicates().tolist()
+
+    row_values = facet_values(facet_row) if facet_row else [None]
+    column_values = facet_values(facet_column) if facet_column else [None]
+    row_count, column_count = len(row_values), len(column_values)
+    facet_gap = 0.04
+    panel_width = (1 - facet_gap * (column_count - 1)) / column_count
+    panel_height = (1 - facet_gap * (row_count - 1)) / row_count
+    traces = []
+    annotations = []
+    combined_layout = {
+        "title": title or "",
+        "margin": {"l": 60, "r": 20, "t": 80, "b": 60},
+        "showlegend": bool(color_column),
+    }
+
+    for row_index, row_value in enumerate(row_values):
+        for column_index, column_value in enumerate(column_values):
+            frame = dataframe
+            if facet_row:
+                frame = frame[frame[facet_row].fillna("Missing").astype(str) == row_value]
+            if facet_column:
+                frame = frame[frame[facet_column].fillna("Missing").astype(str) == column_value]
+            if frame.empty:
+                continue
+
+            single = _build_single_plot(
+                frame, plot_type, x_column, y_column, color_column, "", aggregation
+            )
+            panel_number = row_index * column_count + column_index + 1
+            axis_suffix = "" if panel_number == 1 else str(panel_number)
+            for trace in single["traces"]:
+                trace = dict(trace)
+                trace["xaxis"] = "x" + axis_suffix
+                trace["yaxis"] = "y" + axis_suffix
+                traces.append(trace)
+
+            horizontal_start = column_index * (panel_width + facet_gap)
+            horizontal_end = horizontal_start + panel_width
+            vertical_end = 1 - row_index * (panel_height + facet_gap)
+            vertical_start = vertical_end - panel_height
+            combined_layout["xaxis" + axis_suffix] = {
+                "domain": [horizontal_start, horizontal_end],
+                "anchor": "y" + axis_suffix,
+                "title": single["layout"].get("xaxis", {}).get("title", "") if row_index == row_count - 1 else "",
+            }
+            combined_layout["yaxis" + axis_suffix] = {
+                "domain": [vertical_start, vertical_end],
+                "anchor": "x" + axis_suffix,
+                "title": single["layout"].get("yaxis", {}).get("title", "") if column_index == 0 else "",
+            }
+            if facet_column:
+                annotations.append({
+                    "text": str(column_value), "x": (horizontal_start + horizontal_end) / 2,
+                    "y": 1.02, "xref": "paper", "yref": "paper", "showarrow": False,
+                })
+            if facet_row:
+                annotations.append({
+                    "text": str(row_value), "x": -0.02, "y": (vertical_start + vertical_end) / 2,
+                    "xref": "paper", "yref": "paper", "showarrow": False, "textangle": -90,
+                })
+
+    if not traces:
+        raise ValueError("The selected fields do not contain data to plot.")
+    if not combined_layout["title"]:
+        combined_layout["title"] = "Faceted chart"
+    combined_layout["annotations"] = annotations
+    return {"traces": traces, "layout": combined_layout}

@@ -1,6 +1,6 @@
 import {setStatus} from "./status.js";
 
-const chartColumnInputs = ["chart-x", "chart-y", "chart-color"];
+const chartColumnInputs = ["chart-x", "chart-y", "chart-color", "chart-facet-column", "chart-facet-row"];
 let chartColumns = [];
 
 export function updateChartFields() {

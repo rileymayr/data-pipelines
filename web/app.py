@@ -128,11 +128,15 @@ async def create_chart(event):
         x_column = str(js.document.getElementById("chart-x").value).strip()
         y_column = str(js.document.getElementById("chart-y").value).strip()
         color_column = str(js.document.getElementById("chart-color").value).strip()
+        facet_column = str(js.document.getElementById("chart-facet-column").value).strip()
+        facet_row = str(js.document.getElementById("chart-facet-row").value).strip()
         title = str(js.document.getElementById("chart-title").value).strip()
         aggregation = str(js.document.getElementById("chart-aggregation").value)
         plot = build_plot(
             final_df, plot_type, x_column, y_column, color_column, title,
             aggregation=aggregation,
+            facet_row=facet_row,
+            facet_column=facet_column,
         )
         traces = plot["traces"]
 

@@ -115,6 +115,22 @@
                     <span id="column-options-color" class="combobox-options" role="listbox" aria-label="Group/color column suggestions" hidden></span>
                 </span>
             </label>
+            <label>Horizontal facets (optional)
+                <span class="combobox">
+                    <input id="chart-facet-column" placeholder="One panel per column value" autocomplete="off"
+                        role="combobox" aria-autocomplete="list" aria-controls="column-options-facet-column" aria-expanded="false">
+                    <button type="button" class="combobox-toggle" aria-label="Show horizontal facet suggestions">&#9662;</button>
+                    <span id="column-options-facet-column" class="combobox-options" role="listbox" hidden></span>
+                </span>
+            </label>
+            <label>Vertical facets (optional)
+                <span class="combobox">
+                    <input id="chart-facet-row" placeholder="One panel per row value" autocomplete="off"
+                        role="combobox" aria-autocomplete="list" aria-controls="column-options-facet-row" aria-expanded="false">
+                    <button type="button" class="combobox-toggle" aria-label="Show vertical facet suggestions">&#9662;</button>
+                    <span id="column-options-facet-row" class="combobox-options" role="listbox" hidden></span>
+                </span>
+            </label>
             <div class="full-width chart-actions">
                 <button id="btn-chart" class="btn btn-secondary" py-click="create_chart">Add Chart</button>
                 <span class="chart-action-group">

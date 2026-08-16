@@ -3,198 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Analysis Pipeline</title>
+    <title>Teamwork Dynamics Data Processing</title>
     
     <link rel="preconnect" href="https://pyscript.net" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
     <py-config>
         packages = ["pandas"]
 
         [files]
         "analysis/data_utils.py" = "./analysis/data_utils.py"
+        "analysis/demographics.py" = "./analysis/demographics.py"
+        "analysis/chart_utils.py" = "./analysis/chart_utils.py"
         "web/app.py" = "./web/app.py"
     </py-config>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
-            line-height: 1.6;
-            color: #333;
-        }
-
-        .file-upload-grid {
-            display: grid;
-            grid-template-columns: minmax(220px, max-content) 300px;
-            gap: 15px 30px;
-            align-items: center;
-            max-width: 600px;
-            margin-bottom: 25px;
-        }
-
-        .file-upload-grid label {
-            font-weight: 600;
-        }
-
-        .loading-card {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background-color: #f0f7ff;
-            border: 1px solid #b6d4fe;
-            border-radius: 6px;
-            padding: 12px 16px;
-            max-width: 600px;
-            margin-bottom: 20px;
-        }
-
-        .spinner {
-            width: 18px;
-            height: 18px;
-            border: 3px solid #b6d4fe;
-            border-top: 3px solid #0d6efd;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .button-group {
-            display: flex;
-            gap: 12px;
-            margin-top: 10px;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: 600;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .btn-primary {
-            background-color: #27ae60;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: #219150;
-        }
-
-        .btn-secondary {
-            background-color: #2980b9;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background-color: #1f6391;
-        }
-
-        .status {
-            display: inline-block;
-            font-weight: bold;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #d6d6d6;
-            background: #f7f7f7;
-            color: #333;
-        }
-        .status.loading {
-            background: #fff7d6;
-            border-color: #e8c76d;
-            color: #7a5a00;
-        }
-        .status.ready {
-            background: #e8f7ee;
-            border-color: #9ad3b0;
-            color: #1d6b3d;
-        }
-        .status.error {
-            background: #fdeaea;
-            border-color: #d88a8a;
-            color: #8a1f1f;
-        }
-
-        .download-btn {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 10px 18px;
-            background-color: #8e44ad;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .download-btn:hover {
-            background-color: #71368a;
-        }
-    </style>
+    <link rel="stylesheet" href="web/styles.css">
 </head>
 <body>
 
-    <h2>Data Analysis Pipeline</h2>
+    <div class="top-half">
+        <h2>Teamwork Dynamics Data Processing</h2>
 
-    <div id="loading-banner" class="loading-card">
-        <div class="spinner"></div>
-        <div>
-            <strong>Initializing Python Runtime...</strong><br>
-            <small style="color: #555;">Downloading WebAssembly modules. This takes a few seconds on first load.</small>
+        <details id="upload-details" open>
+            <summary>Survey data files</summary>
+            <div class="file-upload-grid">
+                <label for="csv1">Baseline Team Survey File:</label>
+                <input type="file" id="csv1" accept=".csv">
+
+                <label for="csv2">Weekly Survey File:</label>
+                <input type="file" id="csv2" accept=".csv">
+
+                <label for="csv-static">Static Weekly Columns File:</label>
+                <input type="file" id="csv-static" accept=".csv">
+
+                <label for="csv3">Assessment Scores File:</label>
+                <input type="file" id="csv3" accept=".csv">
+            </div>
+        </details>
+
+        <div class="button-group">
+            <button id="btn-csv" class="btn btn-secondary" py-click="create_csv">Combine Datafiles</button>
+            <div id="combined-download-actions" class="top-downloads" hidden>
+                <div id="download-container"></div>
+                <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
+            </div>
         </div>
-    </div>
 
-    <div class="file-upload-grid">
-        <label for="csv1">Baseline Team Survey File:</label>
-        <input type="file" id="csv1" accept=".csv">
+        <div class="top-status">
+            <div id="output-status" class="status loading" aria-live="polite">Status: Initializing environment...</div>
+        </div>
 
-        <label for="csv2">Weekly Survey File:</label>
-        <input type="file" id="csv2" accept=".csv">
-
-        <label for="csv-static">Static Weekly Columns File:</label>
-        <input type="file" id="csv-static" accept=".csv">
-
-        <label for="csv3">Assessment Scores File:</label>
-        <input type="file" id="csv3" accept=".csv">
-    </div>
-
-    <div class="button-group">
-        <button id="btn-csv" class="btn btn-primary" py-click="create_csv">Create CSV for Analysis</button>
-        <button id="btn-demographics" class="btn btn-secondary" py-click="create_demographics_zip">Create Demographics ZIP</button>
-        <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
     </div>
 
     <hr style="margin: 25px 0;">
 
-    <div id="output-status" class="status loading" aria-live="polite">Status: Initializing environment...</div>
-    <br><br>
-    <div id="download-container"></div>
-    <br>
     <div id="report-container"></div>
-    <br>
-    <div id="plot-container" style="width: 100%; max-width: 800px; height: 450px;"></div>
+    <div id="analysis-tabs" class="analysis-tabs" hidden>
+        <button id="tab-charts" class="tab-btn active" type="button" onclick="show_analysis_tab('charts')">Chart Maker</button>
+        <button id="tab-network" class="tab-btn" type="button" onclick="show_analysis_tab('network')">Network Visualizer</button>
+        <button id="tab-demographics" class="tab-btn" type="button" onclick="show_analysis_tab('demographics')">Demographics Selection</button>
+    </div>
+    <section id="chart-section" hidden>
+        <h3>Chart Maker</h3>
+        <p><span id="column-count">0</span> chartable columns available. Type into a field or choose a column from the suggestions.</p>
+        <div class="chart-builder">
+            <label>Chart type
+                <select id="plot-type" onchange="update_chart_fields()">
+                    <option value="bar">Bar</option>
+                    <option value="histogram">Histogram</option>
+                    <option value="scatterplot">Scatterplot</option>
+                    <option value="violin">Violin</option>
+                </select>
+            </label>
+            <label>Figure title (optional)
+                <input id="chart-title" type="text" placeholder="My chart title">
+            </label>
+            <label id="x-field">X-axis
+                <span class="combobox">
+                    <input id="chart-x" placeholder="Choose or type a column" autocomplete="off"
+                        role="combobox" aria-autocomplete="list" aria-controls="column-options-x" aria-expanded="false">
+                    <button type="button" class="combobox-toggle" aria-label="Show X-axis column suggestions">▾</button>
+                    <span id="column-options-x" class="combobox-options" role="listbox" hidden></span>
+                </span>
+            </label>
+            <label id="y-field">Y-axis
+                <span class="combobox">
+                    <input id="chart-y" placeholder="Choose or type a column" autocomplete="off"
+                        role="combobox" aria-autocomplete="list" aria-controls="column-options-y" aria-expanded="false">
+                    <button type="button" class="combobox-toggle" aria-label="Show Y-axis column suggestions">▾</button>
+                    <span id="column-options-y" class="combobox-options" role="listbox" hidden></span>
+                </span>
+            </label>
+            <label id="aggregation-field">Bar aggregation
+                <select id="chart-aggregation">
+                    <option value="sum">Sum</option>
+                    <option value="mean" selected>Average</option>
+                    <option value="count">Count</option>
+                </select>
+                <small class="field-help">Applied to the Y-axis values within each X-axis group.</small>
+            </label>
+            <label class="full-width">Group / Plotly color (optional)
+                <span class="combobox">
+                    <input id="chart-color" placeholder="Split the chart by this column" autocomplete="off"
+                        role="combobox" aria-autocomplete="list" aria-controls="column-options-color" aria-expanded="false">
+                    <button type="button" class="combobox-toggle" aria-label="Show group/color column suggestions">▾</button>
+                    <span id="column-options-color" class="combobox-options" role="listbox" aria-label="Group/color column suggestions" hidden></span>
+                </span>
+            </label>
+            <div class="full-width chart-actions">
+                <button id="btn-chart" class="btn btn-secondary" py-click="create_chart">Add Chart</button>
+                <span class="chart-action-group">
+                    <button id="btn-download-charts" type="button" class="btn btn-download" onclick="download_all_charts()">Download All Charts</button>
+                    <button id="btn-clear-charts" type="button" class="btn btn-danger" onclick="clear_all_charts()">Clear All Charts</button>
+                </span>
+            </div>
+        </div>
+        <div id="plot-container"></div>
+    </section>
 
-    <script>
-        function set_status(message, kind) {
-            const status = document.getElementById("output-status");
-            if (!status) return;
-            status.innerText = message;
-            status.className = "status " + kind;
-        }
-
-        addEventListener("py:ready", () => {
-            const banner = document.getElementById("loading-banner");
-            if (banner) banner.style.display = "none";
-            set_status("Status: Ready to Process", "ready");
-        });
-    </script>
+    <section id="network-section" hidden>
+        <h3>Student Study-Group Network</h3>
+        <p>Students are connected when they appeared together in a reported Group 1 or Group 2 study group. Edge width shows how many times that connection was reported.</p>
+        <div class="network-controls">
+            <label for="network-classes">Class numbers
+                <select id="network-classes" multiple></select>
+            </label>
+            <div class="network-visualize-control">
+                <label for="network-week">Starting week
+                    <input id="network-week" type="range" min="1" max="3" value="1" step="1"
+                        oninput="document.getElementById('network-week-label').innerText = 'Week ' + this.value">
+                    <span id="network-week-label">Week 1</span>
+                </label>
+                <button id="btn-network" class="btn btn-secondary" py-click="create_network_graph">Visualize Network</button>
+            </div>
+            <div class="network-download-actions">
+                <button id="btn-network-csv" class="btn btn-download" py-click="download_network_csv">Download Network CSV</button>
+                <button id="btn-network-download" class="btn btn-download" py-click="download_network_htmls">Download All Network Visualizations</button>
+            </div>
+        </div>
+        <div id="network-plot-container"></div>
+    </section>
+    <section id="demographics-section" hidden>
+        <h3>Demographics Selection</h3>
+        <p>Select one or more columns to summarize. Optionally group each summary by one or more columns. Grouped exports include an <strong>All Groups</strong> row for comparison with the full dataset. Numeric columns produce averages and percentiles; categorical columns produce counts, unique values, and the most common value.</p>
+        <div class="demographics-builder">
+            <label class="demographics-column-picker">Demographic columns
+                <input id="demographics-search" type="search" placeholder="Filter columns...">
+                <div id="demographics-columns" class="checkbox-list"></div>
+                <span id="demographics-selected-count" class="field-help">0 columns selected</span>
+            </label>
+            <label class="demographics-column-picker">Group by (optional; multiple allowed)
+                <input id="demographics-group-search" type="search" placeholder="Filter grouping columns...">
+                <div id="demographics-group-columns" class="checkbox-list"></div>
+                <span id="demographics-group-selected-count" class="field-help">0 grouping columns selected</span>
+            </label>
+            <div class="demographics-actions">
+                <button id="btn-download-demographics" class="btn btn-download" py-click="download_demographics_zip">Download Demographics ZIP</button>
+            </div>
+        </div>
+    </section>
+    <script type="module" src="web/main.js"></script>
 
     <script type="py" src="web/app.py"></script>
 </body>

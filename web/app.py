@@ -91,7 +91,7 @@ async def download_demographics_zip(event):
     try:
         final_df = await get_combined_df()
         requested = [str(column) for column in js.get_selected_demographics()]
-        group_by = str(js.document.getElementById("demographics-group-by").value).strip() or None
+        group_by = [str(column) for column in js.get_selected_demographic_groups()]
         encoded = base64.b64encode(
             build_demographics_zip(final_df, requested, group_by)
         ).decode("ascii")

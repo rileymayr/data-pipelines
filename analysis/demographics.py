@@ -1,18 +1,13 @@
 """Utilities for exporting pandas describe() demographic summaries."""
 
 import io
-import re
 import zipfile
 
 import pandas as pd
 
 
-def _safe_filename(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_-]+", "_", str(value)).strip("_") or "field"
-
-
 _DESCRIBE_HEADERS = {
-    "count": "Non-missing Count",
+    "count": "Grouping Count",
     "unique": "Unique Value Count",
     "top": "Most Common Value",
     "freq": "Most Common Value Count",
@@ -37,33 +32,46 @@ def _describe_column(dataframe: pd.DataFrame, column: str) -> pd.DataFrame:
 def _describe_grouped(
     dataframe: pd.DataFrame,
     column: str,
-    group_by: str,
+    group_by: list[str],
 ) -> pd.DataFrame:
     """Return one describe() row per grouping value."""
 
     grouped_data = dataframe.copy()
-    group_values = grouped_data[group_by].astype("object")
-    grouped_data[group_by] = group_values.where(group_values.notna(), "Missing")
+    for group_column in group_by:
+        group_values = grouped_data[group_column].astype("object")
+        grouped_data[group_column] = group_values.where(group_values.notna(), "Missing")
     summary = grouped_data.groupby(group_by, dropna=False)[column].describe(include="all")
     summary = summary.reset_index()
-    summary = summary.rename(columns={group_by: "Group", **_DESCRIBE_HEADERS})
+    summary = summary.rename(columns={
+        group_column: f"Group: {group_column}" for group_column in group_by
+    } | _DESCRIBE_HEADERS)
+
+    # Add an overall reference row for comparison with the full dataset.
+    total = _describe_column(dataframe, column).drop(columns=["Column"])
+    for group_column in reversed(group_by):
+        total.insert(0, f"Group: {group_column}", f"All Groups - {group_column}")
+    summary = pd.concat([summary, total], ignore_index=True, sort=False)
     return summary
 
 
 def create_demographics_zip(
     dataframe: pd.DataFrame,
     requested_columns: list[str],
-    group_by: str | None = None,
+    group_by: list[str] | None = None,
 ) -> bytes:
-    """Return per-column pandas describe() summaries and one combined CSV."""
+    """Return a ZIP containing the combined pandas describe() CSV only."""
 
     selected = list(dict.fromkeys(
         column for column in requested_columns if column in dataframe.columns
     ))
     if not selected:
         raise ValueError("Select at least one demographic column.")
-    if group_by and group_by not in dataframe.columns:
-        raise ValueError(f"Grouping column was not found: {group_by}")
+    group_by = list(dict.fromkeys(group_by or []))
+    missing_group_columns = [column for column in group_by if column not in dataframe.columns]
+    if missing_group_columns:
+        raise ValueError(
+            "Grouping column(s) were not found: " + ", ".join(missing_group_columns)
+        )
 
     archive_bytes = io.BytesIO()
     combined = []
@@ -74,25 +82,25 @@ def create_demographics_zip(
             else:
                 breakdown = _describe_column(dataframe, column)
             if group_by:
-                filename = f"{_safe_filename(column)}_grouped-by_{_safe_filename(group_by)}.csv"
-                combined_part = breakdown.assign(Column=column, **{"Group By": group_by})
+                combined_part = breakdown.assign(
+                    Column=column, **{"Group By": ", ".join(group_by)}
+                )
             else:
-                filename = f"{_safe_filename(column)}.csv"
                 combined_part = breakdown.assign(**{"Group By": ""})
-            archive.writestr(filename, breakdown.to_csv(index=False))
             combined.append(combined_part)
 
         all_breakdowns = pd.concat(combined, ignore_index=True, sort=False)
         if group_by:
-            all_breakdowns = all_breakdowns[["Column", "Group By", "Group"] + [
+            group_headers = [f"Group: {group}" for group in group_by]
+            all_breakdowns = all_breakdowns[["Column", "Group By"] + group_headers + [
                 column for column in all_breakdowns.columns
-                if column not in {"Column", "Group By", "Group"}
+                if column not in {"Column", "Group By", *group_headers}
             ]]
         else:
             all_breakdowns = all_breakdowns[["Column", "Group By"] + [
                 column for column in all_breakdowns.columns
                 if column not in {"Column", "Group By"}
             ]]
-        archive.writestr("all_breakdowns.csv", all_breakdowns.to_csv(index=False))
+        archive.writestr("Demographics.csv", all_breakdowns.to_csv(index=False))
 
     return archive_bytes.getvalue()

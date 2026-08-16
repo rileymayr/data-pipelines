@@ -11,7 +11,6 @@ import pandas as pd
 from analysis.chart_utils import build_plot, get_column_names
 from analysis.data_utils import (
     build_student_network,
-    load_static_columns,
     process_all_surveys,
 )
 from analysis.demographics import create_demographics_zip as build_demographics_zip
@@ -52,6 +51,7 @@ def _show_columns(dataframe):
 
     columns = get_column_names(dataframe)
     js.set_column_options(js.JSON.parse(json.dumps(columns)))
+    js.set_demographics_options(js.JSON.parse(json.dumps(columns)))
     js.document.getElementById("column-count").innerText = str(len(columns))
     js.document.getElementById("chart-section").hidden = False
     class_options = sorted(
@@ -64,6 +64,7 @@ def _show_columns(dataframe):
     )
     js.document.getElementById("analysis-tabs").hidden = False
     js.document.getElementById("network-section").hidden = False
+    js.document.getElementById("demographics-section").hidden = False
     js.show_analysis_tab("charts")
     js.document.getElementById("upload-details").open = False
 
@@ -85,21 +86,20 @@ async def create_csv(event):
         js.set_status(f"Error processing files: {error}", "error")
 
 
-async def create_demographics_zip(event):
-    js.set_status("Creating demographics ZIP...", "loading")
+async def download_demographics_zip(event):
+    js.set_status("Creating demographic breakdown ZIP...", "loading")
     try:
         final_df = await get_combined_df()
-        requested = await load_static_columns(_file("csv-static"))
+        requested = [str(column) for column in js.get_selected_demographics()]
+        group_by = str(js.document.getElementById("demographics-group-by").value).strip() or None
         encoded = base64.b64encode(
-            build_demographics_zip(final_df, requested)
+            build_demographics_zip(final_df, requested, group_by)
         ).decode("ascii")
-        link = (
-            '<a href="data:application/zip;base64,' + encoded + '" '
-            'download="demographics_exports.zip" class="download-btn">'
-            "Download Demographics ZIP</a>"
-        )
-        js.document.getElementById("download-container").innerHTML += link
-        js.set_status("Demographics ZIP Generated!", "ready")
+        link = js.document.createElement("a")
+        link.href = "data:application/zip;base64," + encoded
+        link.download = "demographics_breakdowns.zip"
+        link.click()
+        js.set_status("Demographics breakdown ZIP downloaded!", "ready")
     except Exception as error:
         js.set_status(f"Error creating demographics ZIP: {error}", "error")
 

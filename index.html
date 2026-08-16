@@ -50,7 +50,6 @@
             <button id="btn-csv" class="btn btn-secondary" py-click="create_csv">Combine Datafiles</button>
             <div id="combined-download-actions" class="top-downloads" hidden>
                 <div id="download-container"></div>
-                <button id="btn-demographics" class="btn btn-download" py-click="create_demographics_zip">Create Demographics ZIP</button>
                 <button id="btn-report" class="btn btn-secondary" py-click="generate_report">Generate Summary Report</button>
             </div>
         </div>
@@ -67,6 +66,7 @@
     <div id="analysis-tabs" class="analysis-tabs" hidden>
         <button id="tab-charts" class="tab-btn active" type="button" onclick="show_analysis_tab('charts')">Chart Maker</button>
         <button id="tab-network" class="tab-btn" type="button" onclick="show_analysis_tab('network')">Network Visualizer</button>
+        <button id="tab-demographics" class="tab-btn" type="button" onclick="show_analysis_tab('demographics')">Demographics Selection</button>
     </div>
     <section id="chart-section" hidden>
         <h3>Chart Maker</h3>
@@ -139,6 +139,26 @@
             </div>
         </div>
         <div id="network-plot-container"></div>
+    </section>
+    <section id="demographics-section" hidden>
+        <h3>Demographics Selection</h3>
+        <p>Select one or more columns to summarize. Optionally group each summary by another column.</p>
+        <div class="demographics-builder">
+            <label class="demographics-column-picker">Demographic columns
+                <input id="demographics-search" type="search" placeholder="Filter columns...">
+                <div id="demographics-columns" class="checkbox-list"></div>
+                <span id="demographics-selected-count" class="field-help">0 columns selected</span>
+            </label>
+            <label>Group by (optional)
+                <select id="demographics-group-by">
+                    <option value="">No grouping</option>
+                </select>
+                <span class="field-help">Percentages are calculated within each group.</span>
+            </label>
+            <div class="demographics-actions">
+                <button id="btn-download-demographics" class="btn btn-download" py-click="download_demographics_zip">Download Demographics ZIP</button>
+            </div>
+        </div>
     </section>
     <script type="module" src="web/main.js"></script>
 

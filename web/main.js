@@ -12,7 +12,7 @@ export function showAnalysisTab(tab) {
     const showNetwork = tab === "network";
     const showDemographics = tab === "demographics";
     document.getElementById("chart-section").hidden = showNetwork || showDemographics;
-    document.getElementById("network-section").hidden = showNetwork || showDemographics;
+    document.getElementById("network-section").hidden = !showNetwork;
     document.getElementById("demographics-section").hidden = !showDemographics;
     document.getElementById("tab-charts").classList.toggle("active", !showNetwork && !showDemographics);
     document.getElementById("tab-network").classList.toggle("active", showNetwork);

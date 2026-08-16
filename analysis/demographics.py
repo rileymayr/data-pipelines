@@ -1,4 +1,4 @@
-"""Utilities for exporting grouped demographic summaries."""
+"""Utilities for exporting pandas describe() demographic summaries."""
 
 import io
 import re
@@ -11,30 +11,43 @@ def _safe_filename(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", str(value)).strip("_") or "field"
 
 
-def _as_group_values(series: pd.Series) -> pd.Series:
-    """Use stable, readable values in summaries, including missing values."""
+_DESCRIBE_HEADERS = {
+    "count": "Non-missing Count",
+    "unique": "Unique Value Count",
+    "top": "Most Common Value",
+    "freq": "Most Common Value Count",
+    "mean": "Mean",
+    "std": "Standard Deviation",
+    "min": "Minimum",
+    "25%": "25th Percentile",
+    "50%": "Median (50th Percentile)",
+    "75%": "75th Percentile",
+    "max": "Maximum",
+}
 
-    return series.fillna("Missing").astype(str)
+
+def _describe_column(dataframe: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Return one clearly labeled row from pandas' all-types describe output."""
+
+    summary = dataframe[[column]].describe(include="all").T.reset_index()
+    summary = summary.rename(columns={"index": "Column", **_DESCRIBE_HEADERS})
+    return summary
 
 
-def _breakdown(dataframe: pd.DataFrame, column: str, group_by: str | None) -> pd.DataFrame:
-    values = _as_group_values(dataframe[column])
-    if not group_by:
-        counts = values.value_counts(dropna=False).rename("Count").rename_axis("Value").reset_index()
-        counts["Percent"] = counts["Count"] / counts["Count"].sum() * 100
-        return counts[["Value", "Count", "Percent"]]
+def _describe_grouped(
+    dataframe: pd.DataFrame,
+    column: str,
+    group_by: str,
+) -> pd.DataFrame:
+    """Return one describe() row per grouping value."""
 
-    groups = _as_group_values(dataframe[group_by])
-    counts = (
-        pd.DataFrame({"Group": groups, "Value": values})
-        .groupby(["Group", "Value"], dropna=False)
-        .size()
-        .rename("Count")
-        .reset_index()
-    )
-    counts["Group Total"] = counts.groupby("Group")["Count"].transform("sum")
-    counts["Percent"] = counts["Count"] / counts["Group Total"] * 100
-    return counts[["Group", "Value", "Count", "Percent", "Group Total"]]
+    grouped_data = dataframe.copy()
+    group_values = grouped_data[group_by].astype("object")
+    grouped_data[group_by] = group_values.where(group_values.notna(), "Missing")
+    summary = grouped_data.groupby(group_by, dropna=False)[column].describe(include="all")
+    summary = summary.reset_index()
+    summary = summary.rename(columns={group_by: "Group", **_DESCRIBE_HEADERS})
+    return summary
 
 
 def create_demographics_zip(
@@ -42,7 +55,7 @@ def create_demographics_zip(
     requested_columns: list[str],
     group_by: str | None = None,
 ) -> bytes:
-    """Return per-column demographic breakdowns and one combined long-format CSV."""
+    """Return per-column pandas describe() summaries and one combined CSV."""
 
     selected = list(dict.fromkeys(
         column for column in requested_columns if column in dataframe.columns
@@ -56,22 +69,30 @@ def create_demographics_zip(
     combined = []
     with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
         for column in selected:
-            breakdown = _breakdown(dataframe, column, group_by)
+            if group_by:
+                breakdown = _describe_grouped(dataframe, column, group_by)
+            else:
+                breakdown = _describe_column(dataframe, column)
             if group_by:
                 filename = f"{_safe_filename(column)}_grouped-by_{_safe_filename(group_by)}.csv"
                 combined_part = breakdown.assign(Column=column, **{"Group By": group_by})
             else:
                 filename = f"{_safe_filename(column)}.csv"
-                combined_part = breakdown.assign(Column=column, **{"Group By": ""})
+                combined_part = breakdown.assign(**{"Group By": ""})
             archive.writestr(filename, breakdown.to_csv(index=False))
             combined.append(combined_part)
 
-        combined_columns = ["Column", "Group By"]
+        all_breakdowns = pd.concat(combined, ignore_index=True, sort=False)
         if group_by:
-            combined_columns += ["Group", "Value", "Count", "Percent", "Group Total"]
+            all_breakdowns = all_breakdowns[["Column", "Group By", "Group"] + [
+                column for column in all_breakdowns.columns
+                if column not in {"Column", "Group By", "Group"}
+            ]]
         else:
-            combined_columns += ["Value", "Count", "Percent"]
-        all_breakdowns = pd.concat(combined, ignore_index=True)[combined_columns]
+            all_breakdowns = all_breakdowns[["Column", "Group By"] + [
+                column for column in all_breakdowns.columns
+                if column not in {"Column", "Group By"}
+            ]]
         archive.writestr("all_breakdowns.csv", all_breakdowns.to_csv(index=False))
 
     return archive_bytes.getvalue()

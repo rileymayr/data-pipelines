@@ -54,6 +54,14 @@ def _layout(title: str, x_title: str | None = None, y_title: str | None = None) 
     }
 
 
+_BAR_AGGREGATIONS = {
+    "count": ("count", "Count"),
+    "sum": ("sum", "Sum"),
+    "mean": ("mean", "Average"),
+    "average": ("mean", "Average"),
+}
+
+
 def build_plot(
     dataframe: pd.DataFrame,
     plot_type: str,
@@ -61,6 +69,7 @@ def build_plot(
     y_column: str | None = None,
     color_column: str | None = None,
     title: str | None = None,
+    aggregation: str = "mean",
 ) -> dict:
     """Build traces and layout for one configured chart."""
 
@@ -74,12 +83,16 @@ def build_plot(
     traces = []
     if plot_type == "bar":
         x_column = _require_column(dataframe, x_column, "X-axis")
+        aggregation_key = str(aggregation or "mean").lower()
+        if aggregation_key not in _BAR_AGGREGATIONS:
+            raise ValueError("Choose Count, Sum, or Average for bar aggregation.")
+        pandas_aggregation, aggregation_label = _BAR_AGGREGATIONS[aggregation_key]
         for group_name, frame in _groups(dataframe, color_column):
             if y_column:
                 _require_column(dataframe, y_column, "Y-axis")
                 values = _numeric_series(frame, y_column)
                 clean = frame.assign(__chart_value__=values).dropna(subset=["__chart_value__"])
-                summary = clean.groupby(x_column, sort=False)["__chart_value__"].mean()
+                summary = clean.groupby(x_column, sort=False)["__chart_value__"].agg(pandas_aggregation)
                 trace = {
                     "type": "bar",
                     "x": summary.index.astype(str).tolist(),
@@ -95,8 +108,8 @@ def build_plot(
             if group_name is not None:
                 trace["name"] = str(group_name)
             traces.append(trace)
-        default_title = f"Distribution of {x_column}"
-        layout = _layout(title or default_title, x_column, y_column or "Count")
+        default_title = f"{aggregation_label} of {y_column} by {x_column}" if y_column else f"Distribution of {x_column}"
+        layout = _layout(title or default_title, x_column, y_column and aggregation_label or "Count")
 
     elif plot_type == "histogram":
         x_column = _require_column(dataframe, x_column, "X-axis")

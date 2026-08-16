@@ -99,6 +99,14 @@
                     <span id="column-options-y" class="combobox-options" role="listbox" hidden></span>
                 </span>
             </label>
+            <label id="aggregation-field">Bar aggregation
+                <select id="chart-aggregation">
+                    <option value="sum">Sum</option>
+                    <option value="mean" selected>Average</option>
+                    <option value="count">Count</option>
+                </select>
+                <small class="field-help">Applied to the Y-axis values within each X-axis group.</small>
+            </label>
             <label class="full-width">Group / Plotly color (optional)
                 <span class="combobox">
                     <input id="chart-color" placeholder="Split the chart by this column" autocomplete="off"

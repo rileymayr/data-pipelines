@@ -6,6 +6,7 @@ let chartColumns = [];
 export function updateChartFields() {
     const chartType = document.getElementById("plot-type").value;
     document.getElementById("y-field").hidden = chartType === "histogram";
+    document.getElementById("aggregation-field").hidden = chartType !== "bar";
 }
 
 function renderColumnOptions(input, showAll = false) {

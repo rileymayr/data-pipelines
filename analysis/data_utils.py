@@ -335,11 +335,15 @@ def build_student_network(
         for week in weeks
         for group_number in (1, 2)
     }
+    # Count strength by the unordered student pair, while retaining separate
+    # per-group display records so Group 1 and Group 2 keep their line styles.
     edges_by_week: dict[int, dict[tuple[str, str, int], dict]] = {}
+    cumulative_strength: dict[tuple[str, str], int] = {}
     all_network_names = set()
 
     for week in weeks:
-        edge_counts: dict[tuple[str, str, int], dict] = {}
+        week_edges: dict[tuple[str, str, int], dict] = {}
+        week_pair_counts: dict[tuple[str, str], int] = {}
         for _, row in df.iterrows():
             row_class = row.get("Class Number")
             if pd.isna(row_class):
@@ -362,12 +366,23 @@ def build_student_network(
                     }
                 all_network_names.update(members)
                 for source, target in combinations(sorted(members), 2):
-                    edge_key = (source, target, group_number)
-                    edge = edge_counts.setdefault(
-                        edge_key, {"strength": 0, "group_number": group_number}
+                    edge_key = (source, target)
+                    display_key = (source, target, group_number)
+                    edge = week_edges.setdefault(
+                        display_key, {"strength": 0, "group_number": group_number}
                     )
                     edge["strength"] += 1
-        edges_by_week[week] = dict(edge_counts)
+                    week_pair_counts[edge_key] = week_pair_counts.get(edge_key, 0) + 1
+        for edge_key, count in week_pair_counts.items():
+            cumulative_strength[edge_key] = cumulative_strength.get(edge_key, 0) + count
+        # Each displayed group edge uses the pair's cumulative strength.
+        edges_by_week[week] = {
+            display_key: {
+                **edge,
+                "strength": cumulative_strength[(display_key[0], display_key[1])],
+            }
+            for display_key, edge in week_edges.items()
+        }
 
     # Include every selected student even when they have no connections.
     ordered_names = sorted(all_network_names, key=str.casefold)
@@ -405,7 +420,7 @@ def build_student_network(
                     "group_number": edge_data["group_number"],
                     "group_2": edge_data["group_number"] == 2,
                 }
-                for (source, target, _group_number), edge_data in edge_counts.items()
+                for (source, target, group_number), edge_data in edge_counts.items()
             ]
             for week, edge_counts in edges_by_week.items()
         },

@@ -301,13 +301,17 @@ def _network_plot(network):
             dx, dy = target_x - source_x, target_y - source_y
             distance = max(0.05, math.hypot(dx, dy))
             offset_x, offset_y = -dy / distance * offset, dx / distance * offset
+            displayed_group = (
+                str(edge_data.get("group_number", group_number)).strip()
+                if edge_data else str(group_number)
+            )
             traces.append({
                 "type": "scatter", "mode": "lines",
                 "x": [source_x + offset_x, target_x + offset_x, None] if edge_data else [],
                 "y": [source_y + offset_y, target_y + offset_y, None] if edge_data else [],
                 "line": {
                     "width": min(1 + (edge_data["strength"] if edge_data else 0) * 1.5, 12),
-                    "dash": "dash" if group_number == 2 else "solid",
+                    "dash": "dash" if displayed_group == "2" else "solid",
                     "color": "#777",
                 },
                 "hoverinfo": "skip",

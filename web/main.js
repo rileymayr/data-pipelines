@@ -4,6 +4,7 @@ import {
     downloadAllCharts,
     initializeChartMaker,
     setColumnOptions,
+    setWeeklyColumnOptions,
     updateChartFields,
 } from "./chart_maker.js";
 import {downloadNetworkHtmlZip} from "./network_visualizer.js";
@@ -110,6 +111,7 @@ Object.assign(window, {
     download_all_charts: downloadAllCharts,
     download_network_html_zip: downloadNetworkHtmlZip,
     set_column_options: setColumnOptions,
+    set_weekly_column_options: setWeeklyColumnOptions,
     show_analysis_tab: showAnalysisTab,
     update_chart_fields: updateChartFields,
 });

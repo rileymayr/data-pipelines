@@ -11,11 +11,42 @@ GENERATED_COLUMN_PATTERN = re.compile(r"(?:_W\d+|_\d+)$")
 def get_column_names(dataframe: pd.DataFrame) -> list[str]:
     """Return columns intended for interactive chart configuration."""
 
-    return [
+    columns = [
         str(column)
         for column in dataframe.columns
         if not GENERATED_COLUMN_PATTERN.search(str(column))
     ]
+    # Weekly values are stored wide (for example, Trust_W1, Trust_W2, ...).
+    # Expose the logical measure once so the line chart can resolve its weeks.
+    visible = set(columns)
+    for column in dataframe.columns:
+        match = re.match(r"^(?P<measure>.+)_W\d+$", str(column), re.IGNORECASE)
+        if match and match.group("measure") not in visible:
+            columns.append(match.group("measure"))
+            visible.add(match.group("measure"))
+    return columns
+
+
+def get_weekly_column_names(
+    dataframe: pd.DataFrame, weeks: tuple[int, ...] = (1, 2, 3)
+) -> list[str]:
+    """Return logical measures that have every requested wide weekly column."""
+
+    weekly_columns = {str(column) for column in dataframe.columns}
+    measures = []
+    seen = set()
+    for column in dataframe.columns:
+        match = re.match(r"^(?P<measure>.+)_W(?P<week>\d+)$", str(column), re.IGNORECASE)
+        if not match:
+            continue
+        measure = match.group("measure")
+        if measure in seen:
+            continue
+        expected = {f"{measure}_W{week}" for week in weeks}
+        if expected.issubset(weekly_columns):
+            measures.append(measure)
+            seen.add(measure)
+    return measures
 
 
 def _require_column(dataframe: pd.DataFrame, column: str | None, label: str) -> str:
@@ -54,6 +85,18 @@ def _layout(title: str, x_title: str | None = None, y_title: str | None = None) 
     }
 
 
+def _weekly_columns(dataframe: pd.DataFrame, measure: str) -> list[tuple[int, str]]:
+    """Return available wide-form weekly columns for a logical measure."""
+
+    measure = str(measure)
+    columns = []
+    for column in dataframe.columns:
+        match = re.match(r"^(?P<measure>.+)_W(?P<week>\d+)$", str(column), re.IGNORECASE)
+        if match and match.group("measure") == measure:
+            columns.append((int(match.group("week")), str(column)))
+    return sorted(columns)
+
+
 _BAR_AGGREGATIONS = {
     "count": ("count", "Count"),
     "sum": ("sum", "Sum"),
@@ -81,7 +124,43 @@ def _build_single_plot(
         _require_column(dataframe, color_column, "group/color")
 
     traces = []
-    if plot_type == "bar":
+    if plot_type == "line":
+        measure = x_column or y_column
+        if not measure:
+            raise ValueError("Choose a weekly measure column.")
+        weekly_columns = [
+            item for item in _weekly_columns(dataframe, measure) if item[0] in (1, 2, 3)
+        ]
+        if not weekly_columns:
+            raise ValueError(
+                f"No weekly columns found for '{measure}'. Expected names such as '{measure}_W1'."
+            )
+        aggregation_key = str(aggregation or "mean").lower()
+        if aggregation_key not in _BAR_AGGREGATIONS:
+            raise ValueError("Choose Count, Sum, or Average for line aggregation.")
+        pandas_aggregation, aggregation_label = _BAR_AGGREGATIONS[aggregation_key]
+        for group_name, frame in _groups(dataframe, color_column):
+            values = []
+            for _week, column in weekly_columns:
+                numeric = pd.to_numeric(frame[column], errors="coerce").dropna()
+                if numeric.empty:
+                    values.append(None)
+                else:
+                    values.append(float(getattr(numeric, pandas_aggregation)()))
+            if any(value is not None for value in values):
+                trace = {
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "x": [f"Week {week}" for week, _column in weekly_columns],
+                    "y": values,
+                }
+                if group_name is not None:
+                    trace["name"] = str(group_name)
+                traces.append(trace)
+        default_title = f"{measure} progression by week"
+        layout = _layout(title or default_title, "Week", f"{aggregation_label} {measure}")
+
+    elif plot_type == "bar":
         x_column = _require_column(dataframe, x_column, "X-axis")
         aggregation_key = str(aggregation or "mean").lower()
         if aggregation_key not in _BAR_AGGREGATIONS:
@@ -109,7 +188,7 @@ def _build_single_plot(
                 trace["name"] = str(group_name)
             traces.append(trace)
         default_title = f"{aggregation_label} of {y_column} by {x_column}" if y_column else f"Distribution of {x_column}"
-        layout = _layout(title or default_title, x_column, y_column and aggregation_label or "Count")
+        layout = _layout(title or default_title, x_column, y_column or "Count")
 
     elif plot_type == "histogram":
         x_column = _require_column(dataframe, x_column, "X-axis")
@@ -210,6 +289,8 @@ def build_plot(
     aggregation: str = "mean",
     facet_row: str | None = None,
     facet_column: str | None = None,
+    share_x: bool = False,
+    share_y: bool = False,
 ) -> dict:
     """Build a Plotly-compatible chart, optionally split into facet panels."""
 
@@ -279,6 +360,10 @@ def build_plot(
                 "anchor": "x" + axis_suffix,
                 "title": single["layout"].get("yaxis", {}).get("title", "") if column_index == 0 else "",
             }
+            if share_x and facet_row and panel_number > 1:
+                combined_layout["xaxis" + axis_suffix]["matches"] = "x"
+            if share_y and facet_column and panel_number > 1:
+                combined_layout["yaxis" + axis_suffix]["matches"] = "y"
             if facet_column:
                 annotations.append({
                     "text": str(column_value), "x": (horizontal_start + horizontal_end) / 2,

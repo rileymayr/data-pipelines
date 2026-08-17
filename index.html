@@ -76,6 +76,7 @@
                 <select id="plot-type" onchange="update_chart_fields()">
                     <option value="bar">Bar</option>
                     <option value="histogram">Histogram</option>
+                    <option value="line">Line (weekly progression)</option>
                     <option value="scatterplot">Scatterplot</option>
                     <option value="violin">Violin</option>
                 </select>
@@ -83,7 +84,7 @@
             <label>Figure title (optional)
                 <input id="chart-title" type="text" placeholder="My chart title">
             </label>
-            <label id="x-field">X-axis
+            <label id="x-field"><span class="field-label">X-axis</span>
                 <span class="combobox">
                     <input id="chart-x" placeholder="Choose or type a column" autocomplete="off"
                         role="combobox" aria-autocomplete="list" aria-controls="column-options-x" aria-expanded="false">
@@ -91,7 +92,7 @@
                     <span id="column-options-x" class="combobox-options" role="listbox" hidden></span>
                 </span>
             </label>
-            <label id="y-field">Y-axis
+            <label id="y-field"><span class="field-label">Y-axis</span>
                 <span class="combobox">
                     <input id="chart-y" placeholder="Choose or type a column" autocomplete="off"
                         role="combobox" aria-autocomplete="list" aria-controls="column-options-y" aria-expanded="false">
@@ -99,7 +100,7 @@
                     <span id="column-options-y" class="combobox-options" role="listbox" hidden></span>
                 </span>
             </label>
-            <label id="aggregation-field">Bar aggregation
+            <label id="aggregation-field">Aggregation
                 <select id="chart-aggregation">
                     <option value="sum">Sum</option>
                     <option value="mean" selected>Average</option>
@@ -116,19 +117,31 @@
                 </span>
             </label>
             <label>Horizontal facets (optional)
-                <span class="combobox">
-                    <input id="chart-facet-column" placeholder="One panel per column value" autocomplete="off"
-                        role="combobox" aria-autocomplete="list" aria-controls="column-options-facet-column" aria-expanded="false">
-                    <button type="button" class="combobox-toggle" aria-label="Show horizontal facet suggestions">&#9662;</button>
-                    <span id="column-options-facet-column" class="combobox-options" role="listbox" hidden></span>
+                <span class="facet-field">
+                    <span class="combobox">
+                        <input id="chart-facet-column" placeholder="One panel per column value" autocomplete="off"
+                            role="combobox" aria-autocomplete="list" aria-controls="column-options-facet-column" aria-expanded="false">
+                        <button type="button" class="combobox-toggle" aria-label="Show horizontal facet suggestions">&#9662;</button>
+                        <span id="column-options-facet-column" class="combobox-options" role="listbox" hidden></span>
+                    </span>
+                    <span class="facet-option">
+                        <input id="chart-share-y" type="checkbox">
+                        <span>Share Y-axis range</span>
+                    </span>
                 </span>
             </label>
             <label>Vertical facets (optional)
-                <span class="combobox">
-                    <input id="chart-facet-row" placeholder="One panel per row value" autocomplete="off"
-                        role="combobox" aria-autocomplete="list" aria-controls="column-options-facet-row" aria-expanded="false">
-                    <button type="button" class="combobox-toggle" aria-label="Show vertical facet suggestions">&#9662;</button>
-                    <span id="column-options-facet-row" class="combobox-options" role="listbox" hidden></span>
+                <span class="facet-field">
+                    <span class="combobox">
+                        <input id="chart-facet-row" placeholder="One panel per row value" autocomplete="off"
+                            role="combobox" aria-autocomplete="list" aria-controls="column-options-facet-row" aria-expanded="false">
+                        <button type="button" class="combobox-toggle" aria-label="Show vertical facet suggestions">&#9662;</button>
+                        <span id="column-options-facet-row" class="combobox-options" role="listbox" hidden></span>
+                    </span>
+                    <span class="facet-option">
+                        <input id="chart-share-x" type="checkbox">
+                        <span>Share X-axis range</span>
+                    </span>
                 </span>
             </label>
             <div class="full-width chart-actions">

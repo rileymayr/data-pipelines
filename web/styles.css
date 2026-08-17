@@ -205,6 +205,31 @@
             font-weight: 600;
         }
 
+        .facet-field {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px 10px;
+        }
+
+        .facet-field .combobox {
+            flex: 1 1 180px;
+            min-width: 0;
+        }
+
+        .facet-option {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        .facet-option input {
+            margin: 0;
+        }
+
         #chart-section h3 {
             margin-top: 0;
         }

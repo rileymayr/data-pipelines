@@ -8,7 +8,7 @@ import urllib.parse
 import js
 import pandas as pd
 
-from analysis.chart_utils import build_plot, get_column_names
+from analysis.chart_utils import build_plot, get_column_names, get_weekly_column_names
 from analysis.data_utils import (
     build_student_network,
     process_all_surveys,
@@ -51,6 +51,9 @@ def _show_columns(dataframe):
 
     columns = get_column_names(dataframe)
     js.set_column_options(js.JSON.parse(json.dumps(columns)))
+    js.set_weekly_column_options(
+        js.JSON.parse(json.dumps(get_weekly_column_names(dataframe)))
+    )
     js.set_demographics_options(js.JSON.parse(json.dumps(columns)))
     js.document.getElementById("column-count").innerText = str(len(columns))
     js.document.getElementById("chart-section").hidden = False
@@ -130,6 +133,8 @@ async def create_chart(event):
         color_column = str(js.document.getElementById("chart-color").value).strip()
         facet_column = str(js.document.getElementById("chart-facet-column").value).strip()
         facet_row = str(js.document.getElementById("chart-facet-row").value).strip()
+        share_y = bool(js.document.getElementById("chart-share-y").checked)
+        share_x = bool(js.document.getElementById("chart-share-x").checked)
         title = str(js.document.getElementById("chart-title").value).strip()
         aggregation = str(js.document.getElementById("chart-aggregation").value)
         plot = build_plot(
@@ -137,6 +142,8 @@ async def create_chart(event):
             aggregation=aggregation,
             facet_row=facet_row,
             facet_column=facet_column,
+            share_y=share_y,
+            share_x=share_x,
         )
         traces = plot["traces"]
 

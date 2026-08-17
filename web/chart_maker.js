@@ -2,18 +2,27 @@ import {setStatus} from "./status.js";
 
 const chartColumnInputs = ["chart-x", "chart-y", "chart-color", "chart-facet-column", "chart-facet-row"];
 let chartColumns = [];
+let weeklyColumns = [];
 
 export function updateChartFields() {
     const chartType = document.getElementById("plot-type").value;
-    document.getElementById("y-field").hidden = chartType === "histogram";
-    document.getElementById("aggregation-field").hidden = chartType !== "bar";
+    const xField = document.getElementById("x-field");
+    const yLabel = document.querySelector("#y-field > .field-label");
+    document.getElementById("y-field").hidden = chartType === "histogram" || chartType === "line";
+    xField.hidden = false;
+    document.getElementById("aggregation-field").hidden = chartType !== "bar" && chartType !== "line";
+    if (yLabel) yLabel.textContent = "Y-axis";
+    const xLabel = document.querySelector("#x-field > .field-label");
+    if (xLabel) xLabel.textContent = chartType === "line" ? "Weekly measure" : "X-axis";
 }
 
 function renderColumnOptions(input, showAll = false) {
     const options = document.getElementById(input.getAttribute("aria-controls"));
     if (!options) return;
     const query = input.value.trim().toLowerCase();
-    const matches = chartColumns.filter((column) =>
+    const sourceColumns = document.getElementById("plot-type").value === "line"
+        && input.id === "chart-x" ? weeklyColumns : chartColumns;
+    const matches = sourceColumns.filter((column) =>
         showAll || !query || column.toLowerCase().includes(query)
     );
     options.innerHTML = "";
@@ -26,7 +35,7 @@ function renderColumnOptions(input, showAll = false) {
         option.type = "button";
         option.className = "combobox-option";
         option.setAttribute("role", "option");
-        option.textContent = column;
+        option.textContent = weeklyColumns.includes(column) ? `${column} (Weekly)` : column;
         option.addEventListener("mousedown", (event) => event.preventDefault());
         option.addEventListener("click", () => {
             input.value = column;
@@ -58,6 +67,10 @@ export function setColumnOptions(columns) {
             openColumnOptions(input);
         }
     });
+}
+
+export function setWeeklyColumnOptions(columns) {
+    weeklyColumns = Array.from(columns || [], String);
 }
 
 export function initializeChartMaker() {

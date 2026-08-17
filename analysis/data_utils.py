@@ -5,6 +5,9 @@ from itertools import combinations
 from collections import defaultdict
 import pandas as pd
 
+
+WEEKLY_COLUMN_PATTERN = re.compile(r"^(?P<measure>.+)_W(?P<week>\d+)$", re.IGNORECASE)
+
 # Import pyodide for PyScript browser file handling
 try:
     from pyodide.ffi import JsProxy
@@ -249,6 +252,52 @@ def pivot_weekly_survey_to_wide(
     return final_df
 
 
+def add_weekly_descriptive_statistics(
+    dataframe: pd.DataFrame,
+    methods: list[str] | None = None,
+    weeks: tuple[int, ...] = (1, 2, 3),
+) -> pd.DataFrame:
+    """Add row-wise statistics across each measure's weekly columns.
+
+    For example, ``Trust_W1``, ``Trust_W2``, and ``Trust_W3`` produce
+    ``Trust_min``, ``Trust_mean``, and ``Trust_max`` by default. Only the
+    weekly columns that exist are used, so the function also handles missing
+    weeks without changing the original weekly columns.
+    """
+
+    if methods is None:
+        methods = ["min", "mean", "max"]
+    if not methods:
+        return dataframe.copy()
+
+    result = dataframe.copy()
+    weekly_columns: dict[str, list[tuple[int, str]]] = {}
+    for column in result.columns:
+        match = WEEKLY_COLUMN_PATTERN.match(str(column))
+        if match and int(match.group("week")) in weeks:
+            weekly_columns.setdefault(match.group("measure"), []).append(
+                (int(match.group("week")), column)
+            )
+
+    for measure, columns_by_week in weekly_columns.items():
+        columns = [
+            column
+            for _week, column in sorted(columns_by_week, key=lambda item: item[0])
+        ]
+        values = result[columns].apply(pd.to_numeric, errors="coerce")
+        if not values.notna().any().any():
+            continue
+        for method in methods:
+            method_name = str(method).strip().lower()
+            statistic_method = getattr(values, method_name, None)
+            if not method_name or not callable(statistic_method):
+                raise ValueError(f"Unsupported weekly descriptive statistic: {method}")
+            statistic = statistic_method(axis=1, skipna=True)
+            result[f"{measure}_{method_name}"] = statistic
+
+    return result
+
+
 def build_student_network(
     df: pd.DataFrame,
     weeks: list[int] | None = None,
@@ -398,6 +447,7 @@ async def process_all_surveys(
     weekly_wide_df = pivot_weekly_survey_to_wide(
         weekly_df, id_col="Name", week_col='NIFE Week', date_col='', static_cols=static_cols
     )
+    weekly_wide_df = add_weekly_descriptive_statistics(weekly_wide_df)
 
     # 4. Merge Baseline with Pivoted Weekly Data
     final_df = pd.merge(baseline_df, weekly_wide_df, on="Name", how="outer")

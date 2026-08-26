@@ -10,6 +10,7 @@ import pandas as pd
 
 from analysis.chart_utils import build_plot, get_column_names, get_weekly_column_names
 from analysis.data_utils import (
+    build_long_dataframe,
     build_student_network,
     process_all_surveys,
 )
@@ -76,15 +77,19 @@ async def create_csv(event):
     js.set_status("Processing surveys with Pandas...", "loading")
     try:
         final_df = await get_combined_df()
-        encoded_csv = urllib.parse.quote(final_df.to_csv(index=False))
-        link = (
-            f'<a href="data:text/csv;charset=utf-8,{encoded_csv}" '
+        wide_csv = urllib.parse.quote(final_df.to_csv(index=False))
+        long_csv = urllib.parse.quote(build_long_dataframe(final_df).to_csv(index=False))
+        links = (
+            f'<a href="data:text/csv;charset=utf-8,{wide_csv}" '
             'download="processed_survey_data.csv" class="download-btn">'
             "Download Combined Dataframe</a>"
+            f'<a href="data:text/csv;charset=utf-8,{long_csv}" '
+            'download="long_format_data.csv" class="download-btn">'
+            "Download Long Format Data</a>"
         )
-        js.document.getElementById("download-container").innerHTML = link
+        js.document.getElementById("download-container").innerHTML = links
         js.document.getElementById("combined-download-actions").hidden = False
-        js.set_status("Combined CSV Generated!", "ready")
+        js.set_status("Combined and long-format CSVs generated!", "ready")
     except Exception as error:
         js.set_status(f"Error processing files: {error}", "error")
 

@@ -7,6 +7,14 @@ import pandas as pd
 
 
 WEEKLY_COLUMN_PATTERN = re.compile(r"^(?P<measure>.+)_W(?P<week>\d+)$", re.IGNORECASE)
+LONG_GROUP_COLUMN_PATTERN = re.compile(
+    r"^Group (?P<group>[12])#1_(?P<slot>[1-6])_W(?P<week>[1-3])$",
+    re.IGNORECASE,
+)
+LONG_RATING_COLUMN_PATTERN = re.compile(
+    r"^Group Lead (?P<group>[12])_(?P<slot>[1-6])_W(?P<week>[1-3])$",
+    re.IGNORECASE,
+)
 NAME_PREFIX_PATTERN = re.compile(
     r"\b(?:(?:2nd|1st)\.?\s+lt|ltjg|lcdr|capt|maj|ens|lt)\b\.?\s*",
     re.IGNORECASE,
@@ -139,6 +147,13 @@ def format_name(name: str) -> str:
     if not last_name:
         return first_name
     return f"{first_name} {last_name}"
+
+
+def _name_key(name: str) -> str:
+    """Create a dependency-free comparison key for participant names."""
+    if not isinstance(name, str):
+        return ""
+    return " ".join(format_name(name).casefold().split())
 
 
 def convert_category_to_int(
@@ -337,6 +352,105 @@ def add_weekly_descriptive_statistics(
     return result
 
 
+def assign_long_team(
+    rater: str,
+    week: int,
+    group_number: int,
+    reported_members: tuple[str, ...],
+):
+    """Return the team ID for a long-format rating row.
+
+    This is intentionally a stub. A future implementation can compare the
+    reported member cluster across raters and weeks while allowing membership
+    to change. The arguments provide that implementation with the participant,
+    week, source group, and complete nonblank member list.
+    """
+    return pd.NA
+
+
+def build_long_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Reshape wide group-lead ratings into long-format observations."""
+    if "Name" not in df.columns:
+        raise ValueError("The DataFrame does not contain a 'Name' column.")
+
+    group_columns: dict[tuple[int, int, int], str] = {}
+    rating_columns: dict[tuple[int, int, int], str] = {}
+    pair_columns = set()
+
+    for column in df.columns:
+        column_name = str(column)
+        group_match = LONG_GROUP_COLUMN_PATTERN.fullmatch(column_name)
+        if group_match:
+            key = tuple(
+                int(group_match.group(part)) for part in ("week", "group", "slot")
+            )
+            group_columns[key] = column
+            pair_columns.add(column)
+            continue
+
+        rating_match = LONG_RATING_COLUMN_PATTERN.fullmatch(column_name)
+        if rating_match:
+            key = tuple(
+                int(rating_match.group(part)) for part in ("week", "group", "slot")
+            )
+            rating_columns[key] = column
+            pair_columns.add(column)
+
+    extra_columns = [column for column in df.columns if column not in pair_columns]
+    output_columns = ["Rater", "Ratee", "Week", "Team", "Rating", *extra_columns]
+    records = []
+
+    for _, source_row in df.iterrows():
+        rater_value = source_row["Name"]
+        rater = "" if pd.isna(rater_value) else str(rater_value).strip()
+        extras = {column: source_row[column] for column in extra_columns}
+
+        for week in (1, 2, 3):
+            for group_number in (1, 2):
+                member_values = []
+                for slot in range(1, 7):
+                    member_column = group_columns.get((week, group_number, slot))
+                    if member_column is None:
+                        continue
+                    value = source_row[member_column]
+                    if pd.notna(value) and str(value).strip():
+                        member_values.append(str(value).strip())
+                reported_members = tuple(member_values)
+
+                for slot in range(1, 7):
+                    key = (week, group_number, slot)
+                    member_column = group_columns.get(key)
+                    rating_column = rating_columns.get(key)
+                    if member_column is None or rating_column is None:
+                        continue
+
+                    ratee_value = source_row[member_column]
+                    rating = source_row[rating_column]
+                    if (
+                        pd.isna(ratee_value)
+                        or not str(ratee_value).strip()
+                        or pd.isna(rating)
+                        or not str(rating).strip()
+                    ):
+                        continue
+
+                    records.append({
+                        "Rater": rater,
+                        "Ratee": str(ratee_value).strip(),
+                        "Week": week,
+                        "Team": assign_long_team(
+                            rater=rater,
+                            week=week,
+                            group_number=group_number,
+                            reported_members=reported_members,
+                        ),
+                        "Rating": rating,
+                        **extras,
+                    })
+
+    return pd.DataFrame.from_records(records, columns=output_columns)
+
+
 def build_student_network(
     df: pd.DataFrame,
     weeks: list[int] | None = None,
@@ -492,6 +606,7 @@ async def process_all_surveys(
     baseline_df = drop_unfinished_surveys(baseline_df)
     baseline_df = drop_no_names(baseline_df)
     baseline_df["Name"] = baseline_df["Name"].apply(format_name)
+    baseline_df["__name_key"] = baseline_df["Name"].apply(_name_key)
     baseline_df = convert_category_to_int(baseline_df, ["Class Number"])
 
     # 2. Process Weekly Survey Data
@@ -511,15 +626,25 @@ async def process_all_surveys(
         weekly_df, id_col="Name", week_col='NIFE Week', date_col='', static_cols=static_cols
     )
     weekly_wide_df = add_weekly_descriptive_statistics(weekly_wide_df)
+    weekly_wide_df["__name_key"] = weekly_wide_df["Name"].apply(_name_key)
 
     # 4. Merge Baseline with Pivoted Weekly Data
-    final_df = pd.merge(baseline_df, weekly_wide_df, on="Name", how="outer")
+    final_df = pd.merge(
+        baseline_df, weekly_wide_df, on="__name_key", how="outer",
+        suffixes=("", "_weekly"),
+    )
+    final_df["Name"] = final_df["Name"].combine_first(final_df["Name_weekly"])
+    final_df = final_df.drop(columns=["Name_weekly"])
 
     # 5. Optionally Merge Assessment Scores
     if assessment_file is not None:
         assessment_df = await load_csv_data(assessment_file)
         assessment_df = drop_no_names(assessment_df)
         assessment_df["Name"] = assessment_df["Name"].apply(format_name)
-        final_df = pd.merge(final_df, assessment_df, on="Name", how="left")
+        assessment_df["__name_key"] = assessment_df["Name"].apply(_name_key)
+        final_df = pd.merge(
+            final_df, assessment_df, on="__name_key", how="left",
+            suffixes=("", "_assessment"),
+        )
 
-    return final_df
+    return final_df.drop(columns=["__name_key"])

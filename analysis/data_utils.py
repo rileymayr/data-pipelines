@@ -7,6 +7,10 @@ import pandas as pd
 
 
 WEEKLY_COLUMN_PATTERN = re.compile(r"^(?P<measure>.+)_W(?P<week>\d+)$", re.IGNORECASE)
+NAME_PREFIX_PATTERN = re.compile(
+    r"\b(?:(?:2nd|1st)\.?\s+lt|ltjg|lcdr|capt|maj|ens|lt)\b\.?\s*",
+    re.IGNORECASE,
+)
 
 # Import pyodide for PyScript browser file handling
 try:
@@ -100,6 +104,41 @@ def drop_no_names(
     if "Name" not in df.columns:
         raise ValueError("The DataFrame does not contain a 'Name' column.")
     return df[df["Name"].notna() & (df["Name"].str.strip() != "")]
+
+
+def format_name(name: str) -> str:
+    """Formats participant names from 'Last, First M.' or 'Last, First .' to 'First Last',
+
+    stripping common rank/military prefixes and trailing periods.
+    """
+    if not isinstance(name, str):
+        return name
+    name_str = name.strip()
+    if not name_str:
+        return name
+
+    cleaned = NAME_PREFIX_PATTERN.sub("", name_str).strip()
+    if not cleaned:
+        return name_str
+
+    if "," not in cleaned:
+        return cleaned
+
+    parts = [p.strip() for p in cleaned.split(",", 1)]
+    last_name = parts[0]
+    rest = parts[1]
+
+    tokens = [t.strip() for t in rest.split() if t.strip() and t.strip() != "."]
+    if not tokens:
+        return last_name
+
+    first_name = tokens[0]
+    if first_name.endswith("."):
+        first_name = first_name.rstrip(".")
+
+    if not last_name:
+        return first_name
+    return f"{first_name} {last_name}"
 
 
 def convert_category_to_int(
@@ -320,9 +359,12 @@ def build_student_network(
         if column not in df.columns:
             continue
         for name, value in zip(df["Name"], df[column]):
-            if pd.isna(name) or pd.isna(value) or str(name).strip() in class_by_name:
+            if pd.isna(name) or pd.isna(value):
                 continue
-            class_by_name[str(name).strip()] = str(value).strip().removesuffix(".0")
+            cleaned_name = format_name(str(name).strip())
+            if cleaned_name in class_by_name:
+                continue
+            class_by_name[cleaned_name] = str(value).strip().removesuffix(".0")
 
     group_columns = {
         (week, group_number): [
@@ -352,7 +394,7 @@ def build_student_network(
                 row_class = str(row_class).strip().removesuffix(".0")
             for group_number in (1, 2):
                 members = {
-                    str(row[column]).strip()
+                    format_name(str(row[column]).strip())
                     for column in group_columns[(week, group_number)]
                     if column in row.index and pd.notna(row[column]) and str(row[column]).strip()
                 }
@@ -449,12 +491,18 @@ async def process_all_surveys(
     baseline_df = await load_csv_data(baseline_file)
     baseline_df = drop_unfinished_surveys(baseline_df)
     baseline_df = drop_no_names(baseline_df)
+    baseline_df["Name"] = baseline_df["Name"].apply(format_name)
     baseline_df = convert_category_to_int(baseline_df, ["Class Number"])
 
     # 2. Process Weekly Survey Data
     weekly_df = await load_csv_data(weekly_file)
     weekly_df = drop_unfinished_surveys(weekly_df)
     weekly_df = drop_no_names(weekly_df)
+    weekly_df["Name"] = weekly_df["Name"].apply(format_name)
+    group_col_pattern = re.compile(r"^Group \d")
+    for col in weekly_df.columns:
+        if group_col_pattern.match(str(col)):
+            weekly_df[col] = weekly_df[col].apply(format_name)
     weekly_df = convert_category_to_int(weekly_df, ["Class Number"])
     weekly_df = condense_branching_columns(weekly_df)
 
@@ -471,6 +519,7 @@ async def process_all_surveys(
     if assessment_file is not None:
         assessment_df = await load_csv_data(assessment_file)
         assessment_df = drop_no_names(assessment_df)
+        assessment_df["Name"] = assessment_df["Name"].apply(format_name)
         final_df = pd.merge(final_df, assessment_df, on="Name", how="left")
 
     return final_df

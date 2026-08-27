@@ -73,6 +73,7 @@
         <h3>Chart Maker</h3>
         <p><span id="column-count">0</span> chartable columns available. Type into a field or choose a column from the suggestions.</p>
         <div class="chart-builder">
+            <div class="primary-chart-settings">
             <label>Chart type
                 <select id="plot-type" onchange="update_chart_fields()">
                     <option value="bar">Bar</option>
@@ -81,9 +82,6 @@
                     <option value="scatterplot">Scatterplot</option>
                     <option value="violin">Violin</option>
                 </select>
-            </label>
-            <label>Figure title (optional)
-                <input id="chart-title" type="text" placeholder="My chart title">
             </label>
             <label id="x-field"><span class="field-label">X-axis</span>
                 <span class="combobox">
@@ -109,15 +107,33 @@
                 </select>
                 <small class="field-help">Applied to the Y-axis values within each X-axis group.</small>
             </label>
-            <label class="full-width">Group / Plotly color (optional)
+            <div id="chart-specific-settings">
+                <strong>Chart Specific Options</strong>
+                <div id="histogram-bins-field" hidden><span>Bin Behavior</span>
+                <select id="chart-bin-mode">
+                    <option value="auto" selected>Auto</option>
+                    <option value="count">Specify Bin Count</option>
+                    <option value="width">Specify Bin Width</option>
+                </select>
+                <input id="chart-bin-count" type="number" min="1" step="1" placeholder="Bin count" hidden>
+                <input id="chart-bin-width" type="number" min="0" step="any" placeholder="Bin width" hidden>
+                </div>
+            </div>
+            </div>
+            <div class="shared-optional-settings">
+            <span class="shared-optional-heading">Optional Settings</span>
+            <label>Figure title
+                <input id="chart-title" type="text" placeholder="My chart title">
+            </label>
+            <label class="full-width">Grouping Variable
                 <span class="combobox">
-                    <input id="chart-color" placeholder="Split the chart by this column" autocomplete="off"
+                    <input id="chart-color" placeholder="Group values by this column" autocomplete="off"
                         role="combobox" aria-autocomplete="list" aria-controls="column-options-color" aria-expanded="false">
                     <button type="button" class="combobox-toggle" aria-label="Show group/color column suggestions">▾</button>
                     <span id="column-options-color" class="combobox-options" role="listbox" aria-label="Group/color column suggestions" hidden></span>
                 </span>
             </label>
-            <label>Horizontal facets (optional)
+            <label>Horizontal facets
                 <span class="facet-field">
                     <span class="combobox">
                         <input id="chart-facet-column" placeholder="One panel per column value" autocomplete="off"
@@ -131,7 +147,7 @@
                     </span>
                 </span>
             </label>
-            <label>Vertical facets (optional)
+            <label>Vertical facets
                 <span class="facet-field">
                     <span class="combobox">
                         <input id="chart-facet-row" placeholder="One panel per row value" autocomplete="off"
@@ -145,6 +161,7 @@
                     </span>
                 </span>
             </label>
+            </div>
             <div class="full-width chart-actions">
                 <button id="btn-chart" class="btn btn-secondary" py-click="create_chart">Add Chart</button>
                 <span class="chart-action-group">

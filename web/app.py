@@ -51,7 +51,19 @@ async def get_combined_df():
         _file("csv3"),
         static_cols_file=_file("csv-static"),
     )
-    await js.window.session_cache.save_dataframe(combined_df.to_csv(index=False))
+    long_csv = build_long_dataframe(combined_df).to_csv(index=False)
+    await js.window.session_cache.save_dataframe(
+        combined_df.to_csv(index=False),
+        js.JSON.parse(json.dumps({
+            "longCsv": long_csv,
+            "columns": get_column_names(combined_df),
+            "weeklyColumns": get_weekly_column_names(combined_df),
+            "classOptions": sorted(
+                combined_df.get("Class Number", pd.Series(dtype=object))
+                .dropna().astype(str).str.replace(r"\.0$", "", regex=True).unique()
+            ),
+        })),
+    )
     _show_columns(combined_df)
     return combined_df
 
@@ -153,9 +165,20 @@ async def create_chart(event):
         share_x = bool(js.document.getElementById("chart-share-x").checked)
         title = str(js.document.getElementById("chart-title").value).strip()
         aggregation = str(js.document.getElementById("chart-aggregation").value)
+        bin_mode = str(js.document.getElementById("chart-bin-mode").value)
+        bin_width_value = str(js.document.getElementById("chart-bin-width").value).strip()
+        bin_count_value = str(js.document.getElementById("chart-bin-count").value).strip()
+        if bin_mode != "width":
+            bin_width_value = ""
+        if bin_mode != "count":
+            bin_count_value = ""
+        bin_width = float(bin_width_value) if bin_width_value else None
+        bin_count = float(bin_count_value) if bin_count_value else None
         plot = build_plot(
             final_df, plot_type, x_column, y_column, color_column, title,
             aggregation=aggregation,
+            bin_width=bin_width,
+            bin_count=bin_count,
             facet_row=facet_row,
             facet_column=facet_column,
             share_y=share_y,

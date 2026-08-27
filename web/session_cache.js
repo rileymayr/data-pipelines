@@ -68,5 +68,5 @@ export async function loadSession() {
 export async function clearSession() { await clear(); }
 
 window.session_cache = {save_session: saveSession, load_session: loadSession, clear_session: clear,
-    save_dataframe: async (csv) => saveSession({dataframe: csv}),
+    save_dataframe: async (csv, metadata = {}) => saveSession({dataframe: csv, ...metadata}),
     load_dataframe: async () => { const s = await loadSession(); return s && s.dataframe; }};

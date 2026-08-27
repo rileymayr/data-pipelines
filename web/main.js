@@ -8,6 +8,8 @@ import {
     updateChartFields,
 } from "./chart_maker.js";
 import {downloadNetworkHtmlZip} from "./network_visualizer.js";
+import {clearSession, loadSession} from "./session_cache.js";
+import {restoreCharts} from "./chart_maker.js";
 
 export function showAnalysisTab(tab) {
     const showNetwork = tab === "network";
@@ -114,9 +116,36 @@ Object.assign(window, {
     set_weekly_column_options: setWeeklyColumnOptions,
     show_analysis_tab: showAnalysisTab,
     update_chart_fields: updateChartFields,
+    clear_cached_session: async () => { await clearSession(); location.reload(); },
+    download_text_file: (name, content) => {
+        const blob = new Blob([content], {type: "text/csv;charset=utf-8"});
+        const url = URL.createObjectURL(blob); const link = document.createElement("a");
+        link.href = url; link.download = name; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
 });
 
 initializeChartMaker();
 updateChartFields();
 document.getElementById("demographics-search").addEventListener("input", renderDemographicsColumns);
 document.getElementById("demographics-group-search").addEventListener("input", renderDemographicsGroupColumns);
+loadSession().then(async session => {
+    if (!session) return;
+    document.getElementById("analysis-tabs").hidden = false;
+    document.getElementById("chart-section").hidden = false;
+    document.getElementById("combined-download-actions").hidden = false;
+    if (session.charts) await restoreCharts(session.charts);
+    if (session.network) {
+        document.getElementById("network-section").hidden = false;
+        document.getElementById("network-plot-container").innerHTML = '<div id="student-network-plot" class="network-plot-area"></div>';
+        await Plotly.newPlot("student-network-plot", session.network.traces, session.network.layout, {responsive: true});
+        await Plotly.addFrames("student-network-plot", session.network.frames || []);
+        if (session.networkWeek) Plotly.animate("student-network-plot", `W${session.networkWeek}`, {mode: "immediate", transition: {duration: 0}});
+    }
+}).catch(() => {});
+for (const id of ["csv1", "csv2", "csv3", "csv-static"]) {
+    document.getElementById(id).addEventListener("change", () => clearSession().catch(() => {}));
+}
+window.addEventListener("beforeunload", () => {
+    // The Python side writes the dataframe; chart/network modules write figures.
+});

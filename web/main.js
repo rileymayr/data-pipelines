@@ -11,6 +11,35 @@ import {downloadNetworkHtmlZip} from "./network_visualizer.js";
 import {clearSession, loadSession} from "./session_cache.js";
 import {restoreCharts} from "./chart_maker.js";
 
+function restoreDownloadButtons(csv, longCsv) {
+    const container = document.getElementById("download-container");
+    const add = (name, text, content) => {
+        const button = document.createElement("button");
+        button.type = "button"; button.className = "download-btn"; button.textContent = text;
+        button.addEventListener("click", () => window.download_text_file(name, content));
+        return button;
+    };
+    container.replaceChildren(
+        add("processed_survey_data.csv", "Download Combined Dataframe", csv),
+        add("long_format_data.csv", "Download Long Format Data", longCsv || ""),
+    );
+    document.getElementById("combined-download-actions").hidden = false;
+}
+
+function restoreColumnMetadata(session) {
+    if (!session.columns) return;
+    document.getElementById("upload-details").open = false;
+    setColumnOptions(session.columns);
+    setWeeklyColumnOptions(session.weeklyColumns || []);
+    setDemographicsOptions(session.columns);
+    document.getElementById("column-count").textContent = String(session.columns.length);
+    document.getElementById("analysis-tabs").hidden = false;
+    const select = document.getElementById("network-classes");
+    select.replaceChildren(...(session.classOptions || []).map(value => {
+        const option = new Option(value, value); option.selected = true; return option;
+    }));
+}
+
 export function showAnalysisTab(tab) {
     const showNetwork = tab === "network";
     const showDemographics = tab === "demographics";
@@ -20,6 +49,7 @@ export function showAnalysisTab(tab) {
     document.getElementById("tab-charts").classList.toggle("active", !showNetwork && !showDemographics);
     document.getElementById("tab-network").classList.toggle("active", showNetwork);
     document.getElementById("tab-demographics").classList.toggle("active", showDemographics);
+    window.session_cache?.save_session({activeTab: tab}).catch(() => {});
 }
 
 let demographicsColumns = [];
@@ -131,17 +161,16 @@ document.getElementById("demographics-search").addEventListener("input", renderD
 document.getElementById("demographics-group-search").addEventListener("input", renderDemographicsGroupColumns);
 loadSession().then(async session => {
     if (!session) return;
-    document.getElementById("analysis-tabs").hidden = false;
-    document.getElementById("chart-section").hidden = false;
-    document.getElementById("combined-download-actions").hidden = false;
+    restoreColumnMetadata(session);
+    if (session.dataframe) restoreDownloadButtons(session.dataframe, session.longCsv);
     if (session.charts) await restoreCharts(session.charts);
     if (session.network) {
-        document.getElementById("network-section").hidden = false;
         document.getElementById("network-plot-container").innerHTML = '<div id="student-network-plot" class="network-plot-area"></div>';
         await Plotly.newPlot("student-network-plot", session.network.traces, session.network.layout, {responsive: true});
         await Plotly.addFrames("student-network-plot", session.network.frames || []);
         if (session.networkWeek) Plotly.animate("student-network-plot", `W${session.networkWeek}`, {mode: "immediate", transition: {duration: 0}});
     }
+    showAnalysisTab(session.activeTab || "charts");
 }).catch(() => {});
 for (const id of ["csv1", "csv2", "csv3", "csv-static"]) {
     document.getElementById(id).addEventListener("change", () => clearSession().catch(() => {}));

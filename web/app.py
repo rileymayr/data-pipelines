@@ -51,7 +51,19 @@ async def get_combined_df():
         _file("csv3"),
         static_cols_file=_file("csv-static"),
     )
-    await js.window.session_cache.save_dataframe(combined_df.to_csv(index=False))
+    long_csv = build_long_dataframe(combined_df).to_csv(index=False)
+    await js.window.session_cache.save_dataframe(
+        combined_df.to_csv(index=False),
+        js.JSON.parse(json.dumps({
+            "longCsv": long_csv,
+            "columns": get_column_names(combined_df),
+            "weeklyColumns": get_weekly_column_names(combined_df),
+            "classOptions": sorted(
+                combined_df.get("Class Number", pd.Series(dtype=object))
+                .dropna().astype(str).str.replace(r"\.0$", "", regex=True).unique()
+            ),
+        })),
+    )
     _show_columns(combined_df)
     return combined_df
 

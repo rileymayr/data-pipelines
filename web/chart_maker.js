@@ -127,12 +127,20 @@ export function getChartState() {
 
 export async function restoreCharts(charts) {
     clearAllCharts();
-    for (const chart of charts || []) {
-        const id = `restored-plot-${Math.random().toString(36).slice(2)}`;
-        const section = document.createElement("section"); section.className = "plot-card";
+    for (const [index, chart] of (charts || []).entries()) {
+        const id = `restored-plot-${index}`;
+        const cardId = `restored-chart-card-${index}`;
+        const section = document.createElement("section");
+        section.id = cardId; section.className = "plot-card";
         section.dataset.chartTitle = chart.title || "";
+        const toolbar = document.createElement("div"); toolbar.className = "chart-toolbar";
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button"; deleteButton.className = "btn btn-small";
+        deleteButton.textContent = "Delete This Chart";
+        deleteButton.addEventListener("click", () => deleteChart(id, cardId));
+        toolbar.append(deleteButton);
         const area = document.createElement("div"); area.id = id; area.className = "plot-area";
-        section.append(area); document.getElementById("plot-container").prepend(section);
+        section.append(toolbar, area); document.getElementById("plot-container").append(section);
         await Plotly.newPlot(id, chart.data, chart.layout, {responsive: true});
     }
 }

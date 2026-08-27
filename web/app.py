@@ -165,9 +165,7 @@ async def create_chart(event):
         share_x = bool(js.document.getElementById("chart-share-x").checked)
         title = str(js.document.getElementById("chart-title").value).strip()
         aggregation = str(js.document.getElementById("chart-aggregation").value)
-        bin_mode = str(js.document.querySelector(
-            "input[name='histogram-bin-mode']:checked"
-        ).value)
+        bin_mode = str(js.document.getElementById("chart-bin-mode").value)
         bin_width_value = str(js.document.getElementById("chart-bin-width").value).strip()
         bin_count_value = str(js.document.getElementById("chart-bin-count").value).strip()
         if bin_mode != "width":

@@ -19,7 +19,7 @@ export function updateChartFields() {
 }
 
 function updateHistogramBinMode() {
-    const mode = document.querySelector("input[name='histogram-bin-mode']:checked")?.value;
+    const mode = document.getElementById("chart-bin-mode")?.value;
     document.getElementById("chart-bin-count").hidden = mode !== "count";
     document.getElementById("chart-bin-width").hidden = mode !== "width";
 }
@@ -82,9 +82,8 @@ export function setWeeklyColumnOptions(columns) {
 }
 
 export function initializeChartMaker() {
-    document.querySelectorAll("input[name='histogram-bin-mode']").forEach((input) => {
-        input.addEventListener("change", updateHistogramBinMode);
-    });
+    document.getElementById("chart-bin-mode")
+        .addEventListener("change", updateHistogramBinMode);
     updateHistogramBinMode();
     chartColumnInputs.forEach((id) => {
         const input = document.getElementById(id);

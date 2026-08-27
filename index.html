@@ -110,11 +110,11 @@
             <div id="chart-specific-settings">
                 <strong>Chart Specific Options</strong>
                 <div id="histogram-bins-field" hidden><span>Bin Behavior</span>
-                <span class="histogram-bin-modes">
-                    <span><label><input type="radio" name="histogram-bin-mode" value="auto" checked> Auto</label></span>
-                    <span><label><input type="radio" name="histogram-bin-mode" value="count"> Specify Bin Count</label></span>
-                    <span><label><input type="radio" name="histogram-bin-mode" value="width"> Specify Bin Width</label></span>
-                </span>
+                <select id="chart-bin-mode">
+                    <option value="auto" selected>Auto</option>
+                    <option value="count">Specify Bin Count</option>
+                    <option value="width">Specify Bin Width</option>
+                </select>
                 <input id="chart-bin-count" type="number" min="1" step="1" placeholder="Bin count" hidden>
                 <input id="chart-bin-width" type="number" min="0" step="any" placeholder="Bin width" hidden>
                 </div>

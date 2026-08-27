@@ -113,6 +113,8 @@ def _build_single_plot(
     color_column: str | None = None,
     title: str | None = None,
     aggregation: str = "mean",
+    bin_width: float | None = None,
+    bin_count: float | None = None,
 ) -> dict:
     """Build traces and layout for one configured, non-faceted chart."""
 
@@ -120,6 +122,13 @@ def _build_single_plot(
     x_column = x_column or None
     y_column = y_column or None
     color_column = color_column or None
+    if plot_type == "histogram":
+        if bin_width is not None and bin_count is not None:
+            raise ValueError("Choose either a histogram bin width or bin count, not both.")
+        if bin_width is not None and bin_width <= 0:
+            raise ValueError("Histogram bin width must be greater than zero.")
+        if bin_count is not None and (bin_count <= 0 or int(bin_count) != bin_count):
+            raise ValueError("Histogram bin count must be a positive whole number.")
     if color_column:
         _require_column(dataframe, color_column, "group/color")
 
@@ -198,6 +207,10 @@ def _build_single_plot(
                 "type": "histogram",
                 "x": _python_values(values),
             }
+            if bin_width is not None:
+                trace["xbins"] = {"size": float(bin_width)}
+            elif bin_count is not None:
+                trace["nbinsx"] = int(bin_count)
             if group_name is not None:
                 trace["name"] = str(group_name)
             traces.append(trace)
@@ -291,6 +304,8 @@ def build_plot(
     facet_column: str | None = None,
     share_x: bool = False,
     share_y: bool = False,
+    bin_width: float | None = None,
+    bin_count: float | None = None,
 ) -> dict:
     """Build a Plotly-compatible chart, optionally split into facet panels."""
 
@@ -305,7 +320,8 @@ def build_plot(
 
     if not facet_row and not facet_column:
         return _build_single_plot(
-            dataframe, plot_type, x_column, y_column, color_column, title, aggregation
+            dataframe, plot_type, x_column, y_column, color_column, title, aggregation,
+            bin_width, bin_count
         )
 
     def facet_values(column):
@@ -336,7 +352,8 @@ def build_plot(
                 continue
 
             single = _build_single_plot(
-                frame, plot_type, x_column, y_column, color_column, "", aggregation
+                frame, plot_type, x_column, y_column, color_column, "", aggregation,
+                bin_width, bin_count
             )
             panel_number = row_index * column_count + column_index + 1
             axis_suffix = "" if panel_number == 1 else str(panel_number)

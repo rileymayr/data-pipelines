@@ -12,9 +12,16 @@ export function updateChartFields() {
     document.getElementById("y-field").hidden = chartType === "histogram" || chartType === "line";
     xField.hidden = false;
     document.getElementById("aggregation-field").hidden = chartType !== "bar" && chartType !== "line";
+    document.getElementById("histogram-bins-field").hidden = chartType !== "histogram";
     if (yLabel) yLabel.textContent = "Y-axis";
     const xLabel = document.querySelector("#x-field > .field-label");
     if (xLabel) xLabel.textContent = chartType === "line" ? "Weekly measure" : "X-axis";
+}
+
+function updateHistogramBinMode() {
+    const mode = document.querySelector("input[name='histogram-bin-mode']:checked")?.value;
+    document.getElementById("chart-bin-count").hidden = mode !== "count";
+    document.getElementById("chart-bin-width").hidden = mode !== "width";
 }
 
 function renderColumnOptions(input, showAll = false) {
@@ -75,6 +82,10 @@ export function setWeeklyColumnOptions(columns) {
 }
 
 export function initializeChartMaker() {
+    document.querySelectorAll("input[name='histogram-bin-mode']").forEach((input) => {
+        input.addEventListener("change", updateHistogramBinMode);
+    });
+    updateHistogramBinMode();
     chartColumnInputs.forEach((id) => {
         const input = document.getElementById(id);
         const toggle = input.closest(".combobox").querySelector(".combobox-toggle");

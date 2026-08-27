@@ -1,4 +1,5 @@
 import {setStatus} from "./status.js";
+import {saveSession} from "./session_cache.js";
 
 const chartColumnInputs = ["chart-x", "chart-y", "chart-color", "chart-facet-column", "chart-facet-row"];
 let chartColumns = [];
@@ -106,6 +107,7 @@ export function deleteChart(plotId, cardId) {
     if (window.Plotly) window.Plotly.purge(plotId);
     const card = document.getElementById(cardId);
     if (card) card.remove();
+    persistCharts();
 }
 
 export function clearAllCharts() {
@@ -113,7 +115,33 @@ export function clearAllCharts() {
         if (window.Plotly) window.Plotly.purge(plot);
     });
     document.getElementById("plot-container").innerHTML = "";
+    persistCharts();
 }
+
+export function getChartState() {
+    return Array.from(document.querySelectorAll("#plot-container .plot-area")).map(plot => ({
+        data: plot.data, layout: plot.layout,
+        title: plot.parentElement?.dataset.chartTitle || ""
+    }));
+}
+
+export async function restoreCharts(charts) {
+    clearAllCharts();
+    for (const chart of charts || []) {
+        const id = `restored-plot-${Math.random().toString(36).slice(2)}`;
+        const section = document.createElement("section"); section.className = "plot-card";
+        section.dataset.chartTitle = chart.title || "";
+        const area = document.createElement("div"); area.id = id; area.className = "plot-area";
+        section.append(area); document.getElementById("plot-container").prepend(section);
+        await Plotly.newPlot(id, chart.data, chart.layout, {responsive: true});
+    }
+}
+
+async function persistCharts() {
+    const old = await window.session_cache?.load_session();
+    if (old) { old.charts = getChartState(); await saveSession(old); }
+}
+window.persist_chart_state = persistCharts;
 
 export async function downloadAllCharts() {
     const plots = Array.from(document.querySelectorAll("#plot-container .plot-area"));

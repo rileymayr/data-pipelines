@@ -4,6 +4,7 @@ import base64
 import html
 import json
 import urllib.parse
+import io
 
 import js
 import pandas as pd
@@ -32,6 +33,13 @@ async def get_combined_df():
     if combined_df is not None:
         return combined_df
 
+    cached = await js.window.session_cache.load_dataframe()
+    if cached:
+        cached = cached.to_py() if hasattr(cached, "to_py") else str(cached)
+        combined_df = pd.read_csv(io.StringIO(cached))
+        _show_columns(combined_df)
+        return combined_df
+
     file1 = _file("csv1")
     file2 = _file("csv2")
     if not file1 or not file2:
@@ -43,6 +51,7 @@ async def get_combined_df():
         _file("csv3"),
         static_cols_file=_file("csv-static"),
     )
+    await js.window.session_cache.save_dataframe(combined_df.to_csv(index=False))
     _show_columns(combined_df)
     return combined_df
 
@@ -77,15 +86,17 @@ async def create_csv(event):
     js.set_status("Processing surveys with Pandas...", "loading")
     try:
         final_df = await get_combined_df()
-        wide_csv = urllib.parse.quote(final_df.to_csv(index=False))
-        long_csv = urllib.parse.quote(build_long_dataframe(final_df).to_csv(index=False))
+        wide_csv = final_df.to_csv(index=False)
+        long_csv = build_long_dataframe(final_df).to_csv(index=False)
         links = (
-            f'<a href="data:text/csv;charset=utf-8,{wide_csv}" '
-            'download="processed_survey_data.csv" class="download-btn">'
-            "Download Combined Dataframe</a>"
-            f'<a href="data:text/csv;charset=utf-8,{long_csv}" '
-            'download="long_format_data.csv" class="download-btn">'
-            "Download Long Format Data</a>"
+            '<button type="button" class="download-btn" '
+            'onclick="download_text_file(\'processed_survey_data.csv\', this.dataset.content)" '
+            f'data-content="{html.escape(wide_csv, quote=True)}">'
+            "Download Combined Dataframe</button>"
+            '<button type="button" class="download-btn" '
+            'onclick="download_text_file(\'long_format_data.csv\', this.dataset.content)" '
+            f'data-content="{html.escape(long_csv, quote=True)}">'
+            "Download Long Format Data</button>"
         )
         js.document.getElementById("download-container").innerHTML = links
         js.document.getElementById("combined-download-actions").hidden = False
@@ -172,6 +183,7 @@ async def create_chart(event):
         data = js.JSON.parse(json.dumps(traces))
         layout = js.JSON.parse(json.dumps(plot["layout"]))
         js.Plotly.newPlot(plot_id, data, layout, config)
+        await js.window.persist_chart_state()
 
         js.set_status(f"Added {plot_type} chart.", "ready")
     except Exception as error:
@@ -370,6 +382,9 @@ async def create_network_graph(event):
         )
         js.Plotly.addFrames(plot_id, js.JSON.parse(json.dumps(plot["frames"])))
         js.Plotly.animate(plot_id, f"W{week}", {"mode": "immediate", "transition": {"duration": 0}})
+        await js.window.session_cache.save_session(js.JSON.parse(json.dumps({
+            "network": plot, "networkWeek": week, "networkClasses": classes
+        })))
 
         js.set_status("Student network generated.", "ready")
     except Exception as error:
